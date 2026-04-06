@@ -1,5 +1,5 @@
 import { type ReactNode } from "react"
-import { cn } from "@/lib/utils"
+import "./Card.css"
 
 interface CardProps {
   children: ReactNode
@@ -16,6 +16,7 @@ interface CardHeaderProps {
 interface CardBodyProps {
   children: ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
 interface CardFooterProps {
@@ -23,46 +24,29 @@ interface CardFooterProps {
   className?: string
 }
 
-function Card({ children, className }: CardProps) {
-  return (
-    <div className={cn(
-      "bg-[var(--bg-card)] border border-[var(--border-primary)] rounded-lg overflow-hidden",
-      className
-    )}>
-      {children}
-    </div>
-  )
+function Card({ children, className = "" }: CardProps) {
+  return <div className={`card ${className}`}>{children}</div>
 }
 
-function CardHeader({ title, action, children, className }: CardHeaderProps) {
+function CardHeader({ title, action, children, className = "" }: CardHeaderProps) {
   return (
-    <div className={cn(
-      "px-5 py-4 border-b border-[var(--border-primary)] flex items-center justify-between",
-      className
-    )}>
-      {children || <span className="text-sm font-semibold text-[var(--text-primary)]">{title}</span>}
+    <div className={`card-header ${className}`}>
+      {children || <span className="card-title">{title}</span>}
       {action}
     </div>
   )
 }
 
-function CardBody({ children, className }: CardBodyProps) {
+function CardBody({ children, className = "", style }: CardBodyProps) {
   return (
-    <div className={cn("px-5 py-5", className)}>
+    <div className={`card-body ${className}`} style={style}>
       {children}
     </div>
   )
 }
 
-function CardFooter({ children, className }: CardFooterProps) {
-  return (
-    <div className={cn(
-      "px-5 py-3 border-t border-[var(--border-primary)] flex items-center justify-end gap-3",
-      className
-    )}>
-      {children}
-    </div>
-  )
+function CardFooter({ children, className = "" }: CardFooterProps) {
+  return <div className={`card-footer ${className}`}>{children}</div>
 }
 
 export { Card, CardHeader, CardBody, CardFooter }

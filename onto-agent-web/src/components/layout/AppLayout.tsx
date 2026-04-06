@@ -1,16 +1,17 @@
 import { Outlet } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
 import { Header } from "./Header"
+import "./AppLayout.css"
 
 export function AppLayout() {
   return (
-    <div className="flex h-full">
+    <div className="app-layout">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="main-content">
         <Header />
-        <main className="flex-1 overflow-auto bg-[var(--bg-primary)] p-6">
+        <div className="content">
           <Outlet />
-        </main>
+        </div>
       </div>
     </div>
   )

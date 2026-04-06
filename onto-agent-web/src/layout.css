@@ -1,0 +1,11 @@
+/* Layout CSS - Additional layout utilities */
+/* This file can be used for additional layout-specific styles */
+/* Most layout styles are already in design-system.css */
+
+.layout-hidden {
+  display: none !important;
+}
+
+.layout-visible {
+  display: block !important;
+}

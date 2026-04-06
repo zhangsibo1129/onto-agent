@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { cn } from "@/lib/utils"
+import "./Sidebar.css"
 
 const navItems = [
   {
@@ -37,58 +37,38 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="w-[260px] h-full bg-[var(--bg-secondary)] border-r border-[var(--border-primary)] flex flex-col">
-      <div className="h-16 flex items-center px-5 border-b border-[var(--border-primary)]">
-        <div className="w-8 h-8 rounded-lg bg-[var(--brand-primary)] flex items-center justify-center text-white font-bold mr-3">
-          O
-        </div>
-        <span className="text-[var(--text-primary)] font-semibold">OntoAgent</span>
+    <aside className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo-icon">O</div>
+        <span className="logo-text">OntoAgent</span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-4">
+      <nav className="sidebar-nav">
         {navItems.map((section) => (
-          <div key={section.section} className="mb-4">
-            <div className="px-5 py-2 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-              {section.section}
-            </div>
+          <div key={section.section} className="nav-section">
+            <div className="nav-section-title">{section.section}</div>
             {section.items.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  cn(
-                    "flex items-center h-9 px-5 mx-2 rounded-md text-sm transition-colors",
-                    isActive
-                      ? "bg-[rgba(59,130,246,0.1)] text-[var(--brand-primary)]"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                  )
+                  `nav-item ${isActive ? "active" : ""}`
                 }
               >
-                <span className="mr-3 text-base">{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className={cn(
-                    "text-xs px-1.5 py-0.5 rounded-full",
-                    item.badge === "AI"
-                      ? "bg-[var(--brand-secondary)] text-white"
-                      : "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
-                  )}>
-                    {item.badge}
-                  </span>
-                )}
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+                {item.badge && <span className={`nav-badge ${item.badge === "AI" ? "nav-badge-ai" : ""}`}>{item.badge}</span>}
               </NavLink>
             ))}
           </div>
         ))}
       </nav>
 
-      <div className="h-[72px] flex items-center px-5 border-t border-[var(--border-primary)]">
-        <div className="w-9 h-9 rounded-full bg-[var(--brand-primary)] flex items-center justify-center text-white font-medium mr-3">
-          A
-        </div>
-        <div>
-          <div className="text-sm font-medium text-[var(--text-primary)]">Admin</div>
-          <div className="text-xs text-[var(--text-tertiary)]">系统管理员</div>
+      <div className="sidebar-footer">
+        <div className="user-avatar">A</div>
+        <div className="user-info">
+          <div className="user-name">Admin</div>
+          <div className="user-role">系统管理员</div>
         </div>
       </div>
     </aside>

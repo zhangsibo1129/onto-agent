@@ -185,7 +185,19 @@ export default function Sync() {
             {logs.map((log, i) => (
               <div key={i} className="log-entry">
                 <span className="log-time">{log.time}</span>
-                <span className={`log-level ${log.level}`}>{log.level.toUpperCase()}</span>
+                <span
+                  className="log-dot"
+                  style={{
+                    background:
+                      log.level === "success"
+                        ? "var(--status-success)"
+                        : log.level === "error"
+                        ? "var(--status-error)"
+                        : log.level === "warning"
+                        ? "var(--status-warning)"
+                        : "var(--text-tertiary)",
+                  }}
+                ></span>
                 <span className="log-message">{log.message}</span>
               </div>
             ))}

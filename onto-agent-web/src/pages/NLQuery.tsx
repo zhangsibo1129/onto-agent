@@ -61,15 +61,16 @@ export default function NLQuery() {
       </div>
 
       <div className="nl-ontology-selector">
-        {ontologies.map((ontology) => (
-          <div
-            key={ontology}
-            className={`nl-ontology-chip ${selectedOntology === ontology ? "active" : ""}`}
-            onClick={() => setSelectedOntology(ontology)}
-          >
-            {ontology}
-          </div>
-        ))}
+        <select
+          className="form-select"
+          value={selectedOntology}
+          onChange={(e) => setSelectedOntology(e.target.value)}
+          style={{ width: 200 }}
+        >
+          {ontologies.map((ontology) => (
+            <option key={ontology} value={ontology}>{ontology}</option>
+          ))}
+        </select>
       </div>
 
       <div className="chat-area">

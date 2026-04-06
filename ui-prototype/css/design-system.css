@@ -508,13 +508,11 @@ h6 { font-size: var(--text-sm); }
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
-  font-family: var(--font-sans);
   border-radius: var(--radius-md);
+  border: none;
   cursor: pointer;
   transition: all var(--transition-fast);
-  border: 1px solid transparent;
-  white-space: nowrap;
-  line-height: 1.5;
+  height: 36px;
 }
 
 .btn-primary {
@@ -559,7 +557,8 @@ h6 { font-size: var(--text-sm); }
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: var(--status-error);
+  filter: brightness(1.1);
 }
 
 .btn-success {
@@ -568,17 +567,20 @@ h6 { font-size: var(--text-sm); }
 }
 
 .btn-success:hover {
-  background: #059669;
+  background: var(--status-success);
+  filter: brightness(1.1);
 }
 
 .btn-sm {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--text-xs);
+  height: 28px;
 }
 
 .btn-lg {
   padding: var(--space-3) var(--space-6);
   font-size: var(--text-base);
+  height: 44px;
 }
 
 .btn-icon {
@@ -618,7 +620,7 @@ h6 { font-size: var(--text-sm); }
 }
 
 .card-footer {
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
@@ -757,6 +759,19 @@ h6 { font-size: var(--text-sm); }
   font-family: var(--font-sans);
   color: var(--text-primary);
   transition: all var(--transition-fast);
+  height: 36px;
+}
+
+.form-input-sm {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  height: 28px;
+}
+
+.form-input-lg {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  height: 44px;
 }
 
 .form-input:focus,
@@ -1273,6 +1288,32 @@ h6 { font-size: var(--text-sm); }
 @keyframes skeleton-loading {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* --- Spinner --- */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-primary);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.spinner-lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* --- Scrollbar --- */

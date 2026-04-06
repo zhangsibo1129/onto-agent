@@ -1,5 +1,6 @@
 @import './design-system.css';
 @import './layout.css';
+@import './page-styles.css';
 
 * {
   box-sizing: border-box;

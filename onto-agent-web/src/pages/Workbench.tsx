@@ -43,7 +43,7 @@ const resultData = [
 
 export default function Workbench() {
   return (
-    <>
+    <div className="content" style={{ padding: "var(--space-4)" }}>
       <div className="workbench-layout">
         <div className="workbench-panel">
           <div className="workbench-panel-header">
@@ -220,6 +220,6 @@ export default function Workbench() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

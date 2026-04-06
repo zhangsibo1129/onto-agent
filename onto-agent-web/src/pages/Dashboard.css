@@ -80,7 +80,3 @@
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
 }
-
-.mb-6 {
-  margin-bottom: var(--space-6);
-}

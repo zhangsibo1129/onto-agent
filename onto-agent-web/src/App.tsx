@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { AppLayout } from "@/components/layout"
 import Dashboard from "@/pages/Dashboard"
 import DataSources from "@/pages/DataSources"
+import Ontologies from "@/pages/Ontologies"
 import Placeholder from "@/pages/Placeholder"
 
 function App() {
@@ -12,7 +13,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/data-sources" element={<DataSources />} />
           <Route path="/data-sources/:id" element={<Placeholder title="数据源详情" />} />
-          <Route path="/ontologies" element={<Placeholder title="本体列表" />} />
+          <Route path="/ontologies" element={<Ontologies />} />
           <Route path="/ontologies/:id" element={<Placeholder title="本体建模" />} />
           <Route path="/mapping" element={<Placeholder title="数据映射" />} />
           <Route path="/query" element={<Placeholder title="语义查询" />} />

@@ -23,7 +23,7 @@ function getBreadcrumb(pathname: string): { label: string; isCurrent: boolean }[
   ]
 
   if (pathname === "/") {
-    crumbs[0].isCurrent = true
+    crumbs.push({ label: routeNames["/"], isCurrent: true })
     return crumbs
   }
 

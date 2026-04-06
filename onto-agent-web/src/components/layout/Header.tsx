@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom"
+import { useLocation, Link } from "react-router-dom"
 
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
@@ -17,15 +17,17 @@ const routeNames: Record<string, string> = {
 }
 
 function getBreadcrumb(pathname: string): { label: string; isCurrent: boolean }[] {
+  if (pathname === "/") {
+    return [
+      { label: "首页", isCurrent: false },
+      { label: routeNames["/"], isCurrent: true },
+    ]
+  }
+
   const segments = pathname.split("/").filter(Boolean)
   const crumbs: { label: string; isCurrent: boolean }[] = [
     { label: "首页", isCurrent: false },
   ]
-
-  if (pathname === "/") {
-    crumbs.push({ label: routeNames["/"], isCurrent: true })
-    return crumbs
-  }
 
   let currentPath = ""
   for (const segment of segments) {
@@ -46,10 +48,14 @@ export function Header() {
       <div className="header-left">
         <div className="header-breadcrumb">
           {breadcrumbs.map((crumb, index) => (
-            <span key={index}>
+            <>
               {index > 0 && <span className="separator">/</span>}
-              <span className={crumb.isCurrent ? "current" : ""}>{crumb.label}</span>
-            </span>
+              {index === 0 ? (
+                <Link to="/">{crumb.label}</Link>
+              ) : (
+                <span className={crumb.isCurrent ? "current" : ""}>{crumb.label}</span>
+              )}
+            </>
           ))}
         </div>
       </div>

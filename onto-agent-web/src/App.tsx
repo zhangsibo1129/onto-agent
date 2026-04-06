@@ -4,6 +4,8 @@ import Dashboard from "@/pages/Dashboard"
 import DataSources from "@/pages/DataSources"
 import Ontologies from "@/pages/Ontologies"
 import Mapping from "@/pages/Mapping"
+import Query from "@/pages/Query"
+import NLQuery from "@/pages/NLQuery"
 import Placeholder from "@/pages/Placeholder"
 
 function App() {
@@ -17,8 +19,8 @@ function App() {
           <Route path="/ontologies" element={<Ontologies />} />
           <Route path="/ontologies/:id" element={<Placeholder title="本体建模" />} />
           <Route path="/mapping" element={<Mapping />} />
-          <Route path="/query" element={<Placeholder title="语义查询" />} />
-          <Route path="/nl-query" element={<Placeholder title="自然语言查询" />} />
+          <Route path="/query" element={<Query />} />
+          <Route path="/nl-query" element={<NLQuery />} />
           <Route path="/workbench" element={<Placeholder title="查询工作台" />} />
           <Route path="/versions" element={<Placeholder title="版本管理" />} />
           <Route path="/sync" element={<Placeholder title="数据同步" />} />

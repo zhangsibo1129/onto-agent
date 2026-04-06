@@ -18,19 +18,6 @@ export default function DataSources() {
 
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">数据源管理</h1>
-            <p className="page-description">管理 PostgreSQL 数据库连接，自动采集表结构和元数据</p>
-          </div>
-          <div className="page-actions">
-            <button className="btn btn-secondary">⟳ 刷新全部</button>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ 添加数据源</button>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">数据源总数</div>

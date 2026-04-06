@@ -950,30 +950,23 @@ h6 { font-size: var(--text-sm); }
 
 /* --- Page Header --- */
 .page-header {
-  margin-bottom: var(--space-6);
+  display: none;
 }
 
 .page-header-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--space-2);
+  display: none;
 }
 
 .page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
+  display: none;
 }
 
 .page-description {
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
+  display: none;
 }
 
 .page-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: none;
 }
 
 /* --- Stats Cards --- */

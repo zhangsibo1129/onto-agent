@@ -31,19 +31,6 @@ export default function Ontologies() {
 
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">本体管理</h1>
-            <p className="page-description">创建和管理企业本体语义模型</p>
-          </div>
-          <div className="page-actions">
-            <button className="btn btn-ghost">导入本体</button>
-            <button className="btn btn-primary">+ 创建本体</button>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--space-6)" }}>
         <div className="stat-card">
           <div className="stat-label">本体总数</div>

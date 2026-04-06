@@ -33,15 +33,6 @@ const apiKeys = [
 export default function ApiManagement() {
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">API 管理</h1>
-            <p className="page-description">管理 API 密钥、查看接口文档和监控使用情况</p>
-          </div>
-        </div>
-      </div>
-
       <div className="api-stats-row">
         <div className="api-stat-card">
           <div className="stat-value">24,856</div>

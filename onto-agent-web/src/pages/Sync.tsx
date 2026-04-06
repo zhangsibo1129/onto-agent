@@ -63,15 +63,6 @@ const logs = [
 export default function Sync() {
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">数据同步</h1>
-            <p className="page-description">管理本体与数据源之间的数据同步任务</p>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">同步任务</div>

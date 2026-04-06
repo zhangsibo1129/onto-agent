@@ -25,19 +25,6 @@ const activityDotClass: Record<string, string> = {
 export default function Dashboard() {
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">仪表盘</h1>
-            <p className="page-description">企业本体数据平台运行概览</p>
-          </div>
-          <div className="page-actions">
-            <button className="btn btn-secondary">⟳ 刷新</button>
-            <button className="btn btn-primary">+ 新建本体</button>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">数据源</div>

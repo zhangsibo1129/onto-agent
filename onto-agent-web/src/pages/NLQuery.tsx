@@ -55,11 +55,6 @@ export default function NLQuery() {
 
   return (
     <div className="nl-query-container">
-      <div className="nl-query-header">
-        <h2>自然语言查询</h2>
-        <p>用自然语言描述您的查询需求，AI 将自动转换为 SPARQL 查询</p>
-      </div>
-
       <div className="nl-ontology-selector">
         <select
           className="form-select"

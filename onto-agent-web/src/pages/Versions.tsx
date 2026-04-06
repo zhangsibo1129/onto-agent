@@ -68,19 +68,6 @@ const versions = [
 export default function Versions() {
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">版本管理</h1>
-            <p className="page-description">管理本体版本生命周期：草稿 → 发布 → 归档</p>
-          </div>
-          <div className="page-actions">
-            <button className="btn btn-secondary">比较版本</button>
-            <button className="btn btn-primary">+ 新建草稿</button>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">当前版本</div>

@@ -16,15 +16,6 @@ const ontologies = [
 export default function Permissions() {
   return (
     <>
-      <div className="page-header">
-        <div className="page-header-top">
-          <div>
-            <h1 className="page-title">权限管理</h1>
-            <p className="page-description">管理用户、角色和本体访问权限</p>
-          </div>
-        </div>
-      </div>
-
       <div className="stats-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
         <div className="stat-card">
           <div className="stat-label">用户总数</div>

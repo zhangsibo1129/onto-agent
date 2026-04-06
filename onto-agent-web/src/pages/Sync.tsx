@@ -90,6 +90,20 @@ export default function Sync() {
             <button className="btn btn-ghost btn-sm">显示全部</button>
           </div>
           <div className="sync-card-body">
+            <div className="sync-legend">
+              <div className="sync-legend-item">
+                <span className="sync-legend-dot" style={{ background: "var(--brand-primary)" }}></span>
+                <span>运行中</span>
+              </div>
+              <div className="sync-legend-item">
+                <span className="sync-legend-dot" style={{ background: "var(--status-success)" }}></span>
+                <span>成功</span>
+              </div>
+              <div className="sync-legend-item">
+                <span className="sync-legend-dot" style={{ background: "var(--status-error)" }}></span>
+                <span>失败</span>
+              </div>
+            </div>
             {syncTasks.map((task) => (
               <div key={task.id} className="sync-item">
                 <div

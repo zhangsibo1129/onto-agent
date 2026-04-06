@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自然语言查询 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .nl-query-container {
+      max-width: 900px;
+      margin: 0 auto;
+      height: calc(100vh - var(--header-height) - 80px);
+      display: flex;
+      flex-direction: column;
+    }
+    .nl-query-header {
+      text-align: center;
+      padding: var(--space-6) 0;
+    }
+    .nl-query-header h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-semibold);
+      margin-bottom: var(--space-2);
+    }
+    .nl-query-header p {
+      color: var(--text-secondary);
+      font-size: var(--text-sm);
+    }
+    .nl-ontology-selector {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-6);
+    }
+    .nl-ontology-chip {
+      padding: var(--space-2) var(--space-4);
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-full);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .nl-ontology-chip:hover {
+      border-color: var(--border-secondary);
+      color: var(--text-primary);
+    }
+    .nl-ontology-chip.active {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: var(--brand-primary);
+      color: var(--brand-primary);
+    }
+    .chat-area {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-xl);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    .chat-msg {
+      display: flex;
+      gap: var(--space-4);
+      max-width: 85%;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .chat-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-sm);
+      flex-shrink: 0;
+    }
+    .chat-msg.assistant .chat-avatar {
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+      color: white;
+    }
+    .chat-msg.user .chat-avatar {
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+    }
+    .chat-bubble {
+      padding: var(--space-4);
+      border-radius: var(--radius-lg);
+      font-size: var(--text-sm);
+      line-height: var(--leading-relaxed);
+    }
+    .chat-msg.assistant .chat-bubble {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      color: var(--text-primary);
+    }
+    .chat-msg.user .chat-bubble {
+      background: var(--brand-primary);
+      color: white;
+    }
+    .chat-bubble .cb-title {
+      font-weight: var(--font-semibold);
+      margin-bottom: var(--space-2);
+    }
+    .chat-bubble .cb-query {
+      background: var(--bg-input);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+      margin: var(--space-3) 0;
+      overflow-x: auto;
+    }
+    .chat-bubble .cb-results {
+      margin-top: var(--space-3);
+    }
+    .cb-result-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--text-xs);
+    }
+    .cb-result-table th {
+      background: var(--bg-input);
+      padding: var(--space-2) var(--space-3);
+      text-align: left;
+      font-weight: var(--font-semibold);
+      color: var(--text-tertiary);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .cb-result-table td {
+      padding: var(--space-2) var(--space-3);
+      border-bottom: 1px solid var(--border-primary);
+      color: var(--text-secondary);
+    }
+    .chat-actions {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+    }
+    .chat-input-area {
+      padding: var(--space-4) var(--space-5);
+      border-top: 1px solid var(--border-primary);
+      background: var(--bg-secondary);
+    }
+    .chat-input-wrapper {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-end;
+    }
+    .chat-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      resize: none;
+      min-height: 44px;
+      max-height: 120px;
+    }
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+    .chat-input::placeholder {
+      color: var(--text-tertiary);
+    }
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+    }
+    .suggestion-chip {
+      padding: var(--space-1) var(--space-3);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .suggestion-chip:hover {
+      border-color: var(--brand-primary);
+      color: var(--brand-primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .typing-indicator {
+      display: flex;
+      gap: var(--space-1);
+      padding: var(--space-2) 0;
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-full);
+      background: var(--text-tertiary);
+      animation: typing 1.4s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typing {
+      0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-4px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item active"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">自然语言查询</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-ghost btn-sm">清空对话</button>
+          <button class="btn btn-ghost btn-sm">导出对话</button>
+        </div>
+      </header>
+
+      <div class="content" style="padding: var(--space-4);">
+        <div class="nl-query-container">
+          <div class="nl-ontology-selector">
+            <div class="nl-ontology-chip active">客户360</div>
+            <div class="nl-ontology-chip">供应商网络</div>
+            <div class="nl-ontology-chip">订单全景</div>
+          </div>
+
+          <div class="chat-area">
+            <div class="chat-messages">
+              <!-- Welcome Message -->
+              <div class="chat-msg assistant">
+                <div class="chat-avatar">O</div>
+                <div class="chat-bubble">
+                  <div class="cb-title">您好！我是 OntoAgent 智能查询助手</div>
+                  <div>您可以使用自然语言查询企业数据，我会自动理解您的意图并生成语义查询。试试以下问题：</div>
+                  <div class="suggestions">
+                    <span class="suggestion-chip">显示所有金牌客户</span>
+                    <span class="suggestion-chip">上月订单总额是多少？</span>
+                    <span class="suggestion-chip">哪些客户购买了 Product A？</span>
+                    <span class="suggestion-chip">按地区统计客户数量</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- User Message -->
+              <div class="chat-msg user">
+                <div class="chat-avatar">A</div>
+                <div class="chat-bubble">
+                  显示上月消费金额最高的前5个金牌客户
+                </div>
+              </div>
+
+              <!-- Assistant Response -->
+              <div class="chat-msg assistant">
+                <div class="chat-avatar">O</div>
+                <div class="chat-bubble">
+                  <div>我理解您想查询：<strong>上月消费金额最高的前5个金牌客户</strong></div>
+                  <div style="margin-top: var(--space-2);">已为您生成以下 SPARQL 查询：</div>
+                  <div class="cb-query">PREFIX onto: &lt;http://ontoagent.com/ontology#&gt;
+SELECT ?name ?email ?monthlySpend
+WHERE {
+  ?c rdf:type onto:Customer ;
+     onto:name ?name ;
+     onto:email ?email ;
+     onto:tier "Gold" ;
+     onto:monthlySpend ?monthlySpend .
+  FILTER(?monthlySpend > 0)
+}
+ORDER BY DESC(?monthlySpend)
+LIMIT 5</div>
+                  <div class="cb-results">
+                    <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2);">查询结果 · 执行时间 1.8s · 返回 5 条</div>
+                    <table class="cb-result-table">
+                      <thead>
+                        <tr>
+                          <th>客户名称</th>
+                          <th>邮箱</th>
+                          <th>上月消费</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Apple Inc.</td>
+                          <td class="mono">procurement@apple.com</td>
+                          <td style="color: var(--status-success);">$342,567.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Microsoft Corp.</td>
+                          <td class="mono">orders@microsoft.com</td>
+                          <td style="color: var(--status-success);">$289,123.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Amazon.com</td>
+                          <td class="mono">vendor-relations@amazon.com</td>
+                          <td style="color: var(--status-success);">$256,890.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Google LLC</td>
+                          <td class="mono">purchasing@google.com</td>
+                          <td style="color: var(--status-success);">$198,456.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Meta Platforms</td>
+                          <td class="mono">supply@meta.com</td>
+                          <td style="color: var(--status-success);">$156,789.00</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="chat-actions">
+                    <button class="btn btn-ghost btn-sm">复制查询</button>
+                    <button class="btn btn-ghost btn-sm">在查询工作台打开</button>
+                    <button class="btn btn-ghost btn-sm">导出 CSV</button>
+                    <button class="btn btn-ghost btn-sm">追问</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Follow-up User -->
+              <div class="chat-msg user">
+                <div class="chat-avatar">A</div>
+                <div class="chat-bubble">
+                  这些客户分别下了多少订单？
+                </div>
+              </div>
+
+              <!-- Follow-up Assistant -->
+              <div class="chat-msg assistant">
+                <div class="chat-avatar">O</div>
+                <div class="chat-bubble">
+                  <div>好的，我来查询这些客户的订单数量：</div>
+                  <div class="cb-query">PREFIX onto: &lt;http://ontoagent.com/ontology#&gt;
+SELECT ?name (COUNT(?order) AS ?orderCount) (SUM(?order.amount) AS ?totalAmount)
+WHERE {
+  ?c rdf:type onto:Customer ;
+     onto:name ?name ;
+     onto:tier "Gold" ;
+     onto:places ?order .
+  ?order rdf:type onto:Order .
+  FILTER(?name IN ("Apple Inc.", "Microsoft Corp.", "Amazon.com", "Google LLC", "Meta Platforms"))
+}
+GROUP BY ?name
+ORDER BY DESC(?totalAmount)</div>
+                  <div class="cb-results">
+                    <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2);">查询结果 · 执行时间 2.1s · 返回 5 条</div>
+                    <table class="cb-result-table">
+                      <thead>
+                        <tr>
+                          <th>客户名称</th>
+                          <th>订单数</th>
+                          <th>总金额</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Apple Inc.</td>
+                          <td>1,247</td>
+                          <td style="color: var(--status-success);">$2,456,789.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Microsoft Corp.</td>
+                          <td>986</td>
+                          <td style="color: var(--status-success);">$1,892,345.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Amazon.com</td>
+                          <td>2,103</td>
+                          <td style="color: var(--status-success);">$1,654,230.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Google LLC</td>
+                          <td>756</td>
+                          <td style="color: var(--status-success);">$1,234,567.00</td>
+                        </tr>
+                        <tr>
+                          <td style="color: var(--text-primary); font-weight: var(--font-medium);">Meta Platforms</td>
+                          <td>543</td>
+                          <td style="color: var(--status-success);">$987,654.00</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="chat-actions">
+                    <button class="btn btn-ghost btn-sm">复制查询</button>
+                    <button class="btn btn-ghost btn-sm">导出 CSV</button>
+                    <button class="btn btn-ghost btn-sm">追问</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <textarea class="chat-input" placeholder="输入您的问题，例如：显示所有金牌客户及其订单总额..." rows="1"></textarea>
+                <button class="btn btn-primary" style="height: 44px;">发送</button>
+              </div>
+              <div class="suggestions">
+                <span class="suggestion-chip">对比这些客户的订单趋势</span>
+                <span class="suggestion-chip">哪些产品最受欢迎？</span>
+                <span class="suggestion-chip">生成客户分析报告</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

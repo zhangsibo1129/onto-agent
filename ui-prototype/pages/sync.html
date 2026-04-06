@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据同步 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .sync-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .sync-card-header {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sync-card-body {
+      padding: var(--space-5);
+    }
+    .sync-item {
+      display: flex;
+      align-items: center;
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .sync-item:last-child {
+      border-bottom: none;
+    }
+    .sync-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: var(--space-4);
+    }
+    .sync-info {
+      flex: 1;
+    }
+    .sync-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-1);
+    }
+    .sync-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .sync-progress {
+      width: 200px;
+      margin-right: var(--space-4);
+    }
+    .sync-progress-bar {
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-bottom: var(--space-1);
+    }
+    .sync-progress-fill {
+      height: 100%;
+      background: var(--brand-primary);
+      border-radius: var(--radius-full);
+      transition: width var(--transition-slow);
+    }
+    .sync-progress-text {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .sync-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+    }
+    .sync-status-dot.running {
+      background: var(--brand-primary);
+      animation: pulse 1.5s infinite;
+    }
+    .sync-status-dot.success {
+      background: var(--status-success);
+    }
+    .sync-status-dot.error {
+      background: var(--status-error);
+    }
+    .sync-status-dot.idle {
+      background: var(--text-tertiary);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .sync-schedule {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      margin-top: var(--space-4);
+    }
+    .sync-schedule-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+    }
+    .sync-schedule-item .icon {
+      color: var(--text-tertiary);
+    }
+    .log-entry {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-primary);
+      font-size: var(--text-sm);
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-time {
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      white-space: nowrap;
+    }
+    .log-level {
+      font-size: var(--text-xs);
+      font-weight: var(--font-medium);
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+    }
+    .log-level.info {
+      background: var(--status-info-bg);
+      color: var(--status-info);
+    }
+    .log-level.success {
+      background: var(--status-success-bg);
+      color: var(--status-success);
+    }
+    .log-level.warning {
+      background: var(--status-warning-bg);
+      color: var(--status-warning);
+    }
+    .log-level.error {
+      background: var(--status-error-bg);
+      color: var(--status-error);
+    }
+    .log-message {
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item active"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">数据同步</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-secondary">⟳ 同步全部</button>
+          <button class="btn btn-primary">+ 新建同步任务</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">数据同步</h1>
+              <p class="page-description">管理本体与数据源之间的数据同步任务</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">同步任务</div>
+            <div class="stat-value">4</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">运行中</div>
+            <div class="stat-value" style="color: var(--brand-primary);">1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">今日同步</div>
+            <div class="stat-value">12,847</div>
+            <div class="stat-change positive">条记录</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">最后同步</div>
+            <div class="stat-value text-sm">5 分钟前</div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 380px; gap: var(--space-4);">
+          <div class="sync-card">
+            <div class="sync-card-header">
+              <span class="card-title">同步任务</span>
+              <button class="btn btn-ghost btn-sm">显示全部</button>
+            </div>
+            <div class="sync-card-body">
+              <div class="sync-item">
+                <div class="sync-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--brand-primary);">⟳</div>
+                <div class="sync-info">
+                  <div class="sync-name">客户360 - CRM-Main 同步</div>
+                  <div class="sync-meta">增量同步 · CDC 模式 · 目标: 客户360 v2.1</div>
+                </div>
+                <div class="sync-progress">
+                  <div class="sync-progress-bar">
+                    <div class="sync-progress-fill" style="width: 65%;"></div>
+                  </div>
+                  <div class="sync-progress-text">处理中 · 2,456 / 3,789</div>
+                </div>
+                <div class="sync-status">
+                  <div class="sync-status-dot running"></div>
+                  <span class="text-sm text-secondary">运行中</span>
+                </div>
+                <button class="btn btn-ghost btn-sm">暂停</button>
+              </div>
+
+              <div class="sync-item">
+                <div class="sync-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--status-success);">✓</div>
+                <div class="sync-info">
+                  <div class="sync-name">供应商网络 - SCM-SupplyChain 同步</div>
+                  <div class="sync-meta">全量同步 · 每日 00:00 · 目标: 供应商网络 v1.3</div>
+                </div>
+                <div class="sync-progress">
+                  <div class="sync-progress-bar">
+                    <div class="sync-progress-fill" style="width: 100%; background: var(--status-success);"></div>
+                  </div>
+                  <div class="sync-progress-text">已完成 · 12,450 条</div>
+                </div>
+                <div class="sync-status">
+                  <div class="sync-status-dot success"></div>
+                  <span class="text-sm text-secondary">成功</span>
+                </div>
+                <button class="btn btn-ghost btn-sm">立即同步</button>
+              </div>
+
+              <div class="sync-item">
+                <div class="sync-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--brand-secondary);">⟳</div>
+                <div class="sync-info">
+                  <div class="sync-name">订单全景 - ERP-Production 同步</div>
+                  <div class="sync-meta">增量同步 · 时间戳模式 · 目标: 订单全景 v1.2</div>
+                </div>
+                <div class="sync-progress">
+                  <div class="sync-progress-bar">
+                    <div class="sync-progress-fill" style="width: 100%; background: var(--status-success);"></div>
+                  </div>
+                  <div class="sync-progress-text">已完成 · 8,234 条</div>
+                </div>
+                <div class="sync-status">
+                  <div class="sync-status-dot success"></div>
+                  <span class="text-sm text-secondary">成功</span>
+                </div>
+                <button class="btn btn-ghost btn-sm">立即同步</button>
+              </div>
+
+              <div class="sync-item">
+                <div class="sync-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--status-error);">!</div>
+                <div class="sync-info">
+                  <div class="sync-name">库存管理 - ERP-Production 同步</div>
+                  <div class="sync-meta">全量同步 · 手动触发 · 目标: 库存管理 v0.5</div>
+                </div>
+                <div class="sync-progress">
+                  <div class="sync-progress-bar">
+                    <div class="sync-progress-fill" style="width: 0%; background: var(--status-error);"></div>
+                  </div>
+                  <div class="sync-progress-text" style="color: var(--status-error);">连接失败</div>
+                </div>
+                <div class="sync-status">
+                  <div class="sync-status-dot error"></div>
+                  <span class="text-sm text-secondary">失败</span>
+                </div>
+                <button class="btn btn-ghost btn-sm">重试</button>
+              </div>
+
+              <div class="sync-schedule">
+                <div class="sync-schedule-item">
+                  <span class="icon">⏰</span>
+                  <span>下次全量同步:</span>
+                  <strong>明天 00:00</strong>
+                </div>
+                <div class="sync-schedule-item">
+                  <span class="icon">📊</span>
+                  <span>本周已同步:</span>
+                  <strong>156,789 条</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sync-card">
+            <div class="sync-card-header">
+              <span class="card-title">同步日志</span>
+              <button class="btn btn-ghost btn-sm">查看全部</button>
+            </div>
+            <div class="sync-card-body" style="max-height: 500px; overflow-y: auto;">
+              <div class="log-entry">
+                <span class="log-time">14:32:15</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">客户360同步任务已启动</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:16</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">连接数据源 CRM-Main...</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:17</span>
+                <span class="log-level success">INFO</span>
+                <span class="log-message">连接成功，开始读取变更数据</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:18</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">读取到 456 条新增记录</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:19</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">读取到 1,234 条更新记录</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:20</span>
+                <span class="log-level warning">WARN</span>
+                <span class="log-message">检测到 3 条数据冲突，已标记待处理</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:21</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">正在写入本体图数据库...</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">14:32:25</span>
+                <span class="log-level success">SUCCESS</span>
+                <span class="log-message">同步完成，成功写入 2,456 条</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">13:15:00</span>
+                <span class="log-level info">INFO</span>
+                <span class="log-message">供应商网络同步任务已启动</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">13:15:30</span>
+                <span class="log-level success">SUCCESS</span>
+                <span class="log-message">全量同步完成，处理 12,450 条</span>
+              </div>
+              <div class="log-entry">
+                <span class="log-time">12:00:00</span>
+                <span class="log-level error">ERROR</span>
+                <span class="log-message">库存管理同步失败: 连接超时</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

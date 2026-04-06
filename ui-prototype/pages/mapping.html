@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据映射 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .mapping-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: var(--space-4);
+      height: calc(100vh - var(--header-height) - 140px);
+    }
+    .mapping-panel-side {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .mapping-panel-header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mapping-panel-header .mph-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
+    }
+    .mapping-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-3);
+    }
+    .mapping-table-item {
+      padding: var(--space-3);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .mapping-table-item:hover {
+      border-color: var(--border-secondary);
+    }
+    .mapping-table-item.active {
+      border-color: var(--brand-primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .mapping-table-item .mti-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      color: var(--text-primary);
+      margin-bottom: var(--space-1);
+    }
+    .mapping-table-item .mti-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .mapping-center {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .mapping-center-header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mapping-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .mapping-selector select {
+      background: var(--bg-input);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+    .mapping-arrow {
+      color: var(--brand-accent);
+      font-size: var(--text-lg);
+    }
+    .mapping-columns {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-4);
+    }
+    .mapping-row {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr;
+      gap: var(--space-3);
+      align-items: center;
+      padding: var(--space-3);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      background: var(--bg-tertiary);
+      transition: all var(--transition-fast);
+    }
+    .mapping-row:hover {
+      border-color: var(--border-secondary);
+    }
+    .mapping-row.mapped {
+      border-color: var(--status-success);
+      background: var(--status-success-bg);
+    }
+    .mapping-row.unmapped {
+      border-style: dashed;
+      opacity: 0.6;
+    }
+    .mapping-col {
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-input);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+    }
+    .mapping-col .mc-name {
+      font-weight: var(--font-medium);
+      color: var(--text-primary);
+    }
+    .mapping-col .mc-type {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+    }
+    .mapping-connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-accent);
+    }
+    .mapping-connector.connected {
+      color: var(--status-success);
+    }
+    .mapping-stats {
+      display: flex;
+      gap: var(--space-6);
+      padding: var(--space-3) var(--space-4);
+      border-top: 1px solid var(--border-primary);
+      background: var(--bg-tertiary);
+    }
+    .mapping-stat {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .mapping-stat span {
+      font-weight: var(--font-semibold);
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item active"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <a href="ontologies-list.html">本体管理</a>
+            <span class="separator">/</span>
+            <span class="current">数据映射</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-ghost">自动映射</button>
+          <button class="btn btn-secondary">验证映射</button>
+          <button class="btn btn-primary">保存映射</button>
+        </div>
+      </header>
+
+      <div class="content" style="padding: var(--space-4);">
+        <!-- Mapping Selection Bar -->
+        <div class="card mb-4">
+          <div class="card-body" style="padding: var(--space-4);">
+            <div class="flex items-center gap-4">
+              <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label class="form-label" style="margin-bottom: var(--space-1);">本体</label>
+                <select class="form-select">
+                  <option>客户360</option>
+                  <option>供应商网络</option>
+                  <option>订单全景</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label class="form-label" style="margin-bottom: var(--space-1);">对象类型</label>
+                <select class="form-select">
+                  <option>Customer</option>
+                  <option>Order</option>
+                  <option>Product</option>
+                  <option>Address</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label class="form-label" style="margin-bottom: var(--space-1);">数据源</label>
+                <select class="form-select">
+                  <option>CRM-Main</option>
+                  <option>ERP-Production</option>
+                  <option>SCM-SupplyChain</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                <label class="form-label" style="margin-bottom: var(--space-1);">数据表</label>
+                <select class="form-select">
+                  <option>customers</option>
+                  <option>accounts</option>
+                  <option>client_info</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mapping-layout">
+          <!-- Left: Ontology Properties -->
+          <div class="mapping-panel-side">
+            <div class="mapping-panel-header">
+              <span class="mph-title">本体属性</span>
+              <span class="badge badge-info">12</span>
+            </div>
+            <div style="padding: var(--space-3);">
+              <div class="search-input" style="width: 100%;">
+                <span class="icon">⌕</span>
+                <input type="text" placeholder="搜索属性..." style="width: 100%;">
+              </div>
+            </div>
+            <div class="mapping-panel-body">
+              <div class="mapping-table-item active">
+                <div class="mti-name">customerId</div>
+                <div class="mti-meta">UUID · 主键</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">name</div>
+                <div class="mti-meta">String · 必填</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">email</div>
+                <div class="mti-meta">String</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">phone</div>
+                <div class="mti-meta">String</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">tier</div>
+                <div class="mti-meta">Enum</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">lifetimeValue</div>
+                <div class="mti-meta">Decimal</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">createdAt</div>
+                <div class="mti-meta">DateTime</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">status</div>
+                <div class="mti-meta">Enum</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center: Mapping Grid -->
+          <div class="mapping-center">
+            <div class="mapping-center-header">
+              <span class="font-semibold text-sm">字段映射</span>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">清除未映射</button>
+                <button class="btn btn-ghost btn-sm">智能推荐</button>
+              </div>
+            </div>
+            <div class="mapping-columns">
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">customerId</div>
+                  <div class="mc-type">UUID</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">customer_id</div>
+                  <div class="mc-type">uuid</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">name</div>
+                  <div class="mc-type">String</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">customer_name</div>
+                  <div class="mc-type">varchar(255)</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">email</div>
+                  <div class="mc-type">String</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">email_address</div>
+                  <div class="mc-type">varchar(255)</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">phone</div>
+                  <div class="mc-type">String</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">phone_number</div>
+                  <div class="mc-type">varchar(50)</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">tier</div>
+                  <div class="mc-type">Enum</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">customer_tier</div>
+                  <div class="mc-type">varchar(20)</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">lifetimeValue</div>
+                  <div class="mc-type">Decimal</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">lifetime_value</div>
+                  <div class="mc-type">numeric(15,2)</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">createdAt</div>
+                  <div class="mc-type">DateTime</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">created_at</div>
+                  <div class="mc-type">timestamp</div>
+                </div>
+              </div>
+              <div class="mapping-row mapped">
+                <div class="mapping-col">
+                  <div class="mc-name">status</div>
+                  <div class="mc-type">Enum</div>
+                </div>
+                <div class="mapping-connector connected">⇄</div>
+                <div class="mapping-col">
+                  <div class="mc-name">status</div>
+                  <div class="mc-type">varchar(20)</div>
+                </div>
+              </div>
+              <div class="mapping-row unmapped">
+                <div class="mapping-col">
+                  <div class="mc-name">industry</div>
+                  <div class="mc-type">String</div>
+                </div>
+                <div class="mapping-connector">○</div>
+                <div class="mapping-col" style="opacity: 0.4;">
+                  <div class="mc-name">未映射</div>
+                </div>
+              </div>
+              <div class="mapping-row unmapped">
+                <div class="mapping-col">
+                  <div class="mc-name">website</div>
+                  <div class="mc-type">String</div>
+                </div>
+                <div class="mapping-connector">○</div>
+                <div class="mapping-col" style="opacity: 0.4;">
+                  <div class="mc-name">未映射</div>
+                </div>
+              </div>
+              <div class="mapping-row unmapped">
+                <div class="mapping-col">
+                  <div class="mc-name">annualRevenue</div>
+                  <div class="mc-type">Decimal</div>
+                </div>
+                <div class="mapping-connector">○</div>
+                <div class="mapping-col" style="opacity: 0.4;">
+                  <div class="mc-name">未映射</div>
+                </div>
+              </div>
+              <div class="mapping-row unmapped">
+                <div class="mapping-col">
+                  <div class="mc-name">employeeCount</div>
+                  <div class="mc-type">Integer</div>
+                </div>
+                <div class="mapping-connector">○</div>
+                <div class="mapping-col" style="opacity: 0.4;">
+                  <div class="mc-name">未映射</div>
+                </div>
+              </div>
+            </div>
+            <div class="mapping-stats">
+              <div class="mapping-stat">已映射: <span style="color: var(--status-success);">8</span></div>
+              <div class="mapping-stat">未映射: <span style="color: var(--text-warning);">4</span></div>
+              <div class="mapping-stat">映射率: <span>66.7%</span></div>
+            </div>
+          </div>
+
+          <!-- Right: Source Columns -->
+          <div class="mapping-panel-side">
+            <div class="mapping-panel-header">
+              <span class="mph-title">表字段</span>
+              <span class="badge badge-info">15</span>
+            </div>
+            <div style="padding: var(--space-3);">
+              <div class="text-xs text-tertiary mb-2">CRM-Main.public.customers</div>
+              <div class="search-input" style="width: 100%;">
+                <span class="icon">⌕</span>
+                <input type="text" placeholder="搜索字段..." style="width: 100%;">
+              </div>
+            </div>
+            <div class="mapping-panel-body">
+              <div class="mapping-table-item">
+                <div class="mti-name">customer_id</div>
+                <div class="mti-meta">uuid · PK</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">customer_name</div>
+                <div class="mti-meta">varchar(255)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">email_address</div>
+                <div class="mti-meta">varchar(255)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">phone_number</div>
+                <div class="mti-meta">varchar(50)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">customer_tier</div>
+                <div class="mti-meta">varchar(20)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">lifetime_value</div>
+                <div class="mti-meta">numeric(15,2)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">created_at</div>
+                <div class="mti-meta">timestamp</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">status</div>
+                <div class="mti-meta">varchar(20)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">industry_code</div>
+                <div class="mti-meta">varchar(10)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">website_url</div>
+                <div class="mti-meta">varchar(500)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">annual_revenue</div>
+                <div class="mti-meta">numeric(15,2)</div>
+              </div>
+              <div class="mapping-table-item">
+                <div class="mti-name">employee_count</div>
+                <div class="mti-meta">integer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

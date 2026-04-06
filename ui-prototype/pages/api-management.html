@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 管理 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .api-endpoint {
+      display: flex;
+      align-items: center;
+      padding: var(--space-4);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      transition: all var(--transition-fast);
+    }
+    .api-endpoint:hover {
+      border-color: var(--border-secondary);
+    }
+    .api-method {
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      font-weight: var(--font-bold);
+      font-family: var(--font-mono);
+      margin-right: var(--space-3);
+      min-width: 50px;
+      text-align: center;
+    }
+    .api-method.get {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--status-success);
+    }
+    .api-method.post {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--brand-primary);
+    }
+    .api-method.put {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--status-warning);
+    }
+    .api-method.delete {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--status-error);
+    }
+    .api-path {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+    .api-path .param {
+      color: var(--brand-accent);
+    }
+    .api-auth {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-left: var(--space-4);
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .api-key-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+    }
+    .api-key-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .api-key-value {
+      display: flex;
+      align-items: center;
+      background: var(--bg-input);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+    }
+    .api-key-value .key {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .api-key-value .masked {
+      color: var(--text-tertiary);
+    }
+    .api-stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+    .api-stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      text-align: center;
+    }
+    .api-stat-card .stat-value {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-bold);
+      color: var(--text-primary);
+    }
+    .api-stat-card .stat-label {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: var(--space-1);
+    }
+    .api-stat-card .stat-change {
+      font-size: var(--text-xs);
+      margin-top: var(--space-1);
+    }
+    .api-stat-card .stat-change.up {
+      color: var(--status-success);
+    }
+    .api-stat-card .stat-change.down {
+      color: var(--status-error);
+    }
+    .rate-limit-bar {
+      height: 4px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin-top: var(--space-2);
+    }
+    .rate-limit-fill {
+      height: 100%;
+      background: var(--brand-primary);
+      border-radius: var(--radius-full);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item active"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">API 管理</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-secondary">查看文档</button>
+          <button class="btn btn-primary">+ 创建 API 密钥</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">API 管理</h1>
+              <p class="page-description">管理 API 密钥、查看接口文档和监控使用情况</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="api-stats-row">
+          <div class="api-stat-card">
+            <div class="stat-value">24,856</div>
+            <div class="stat-label">今日请求</div>
+            <div class="stat-change up">↑ 12.5% 较昨日</div>
+          </div>
+          <div class="api-stat-card">
+            <div class="stat-value">156ms</div>
+            <div class="stat-label">平均响应时间</div>
+            <div class="stat-change down">↓ 8ms 改善</div>
+          </div>
+          <div class="api-stat-card">
+            <div class="stat-value">99.9%</div>
+            <div class="stat-label">可用率</div>
+            <div class="stat-change up">正常运行</div>
+          </div>
+          <div class="api-stat-card">
+            <div class="stat-value">5,000</div>
+            <div class="stat-label">速率限制 (req/min)</div>
+            <div class="rate-limit-bar">
+              <div class="rate-limit-fill" style="width: 42%;"></div>
+            </div>
+            <div class="stat-label" style="margin-top: var(--space-1);">已用 42%</div>
+          </div>
+        </div>
+
+        <div class="tabs mb-4">
+          <div class="tab active">API 密钥</div>
+          <div class="tab">接口文档</div>
+          <div class="tab">使用统计</div>
+          <div class="tab">日志</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 400px; gap: var(--space-4);">
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">API 接口</span>
+                <button class="btn btn-ghost btn-sm">Swagger 文档</button>
+              </div>
+              <div class="card-body">
+                <div class="text-sm text-secondary mb-4">基础 URL: <span class="mono" style="color: var(--brand-accent);">https://api.ontoagent.com/v1</span></div>
+                
+                <div class="property-section-title mb-3">本体查询</div>
+                <div class="api-endpoint">
+                  <span class="api-method get">GET</span>
+                  <span class="api-path">/ontologies/{ontologyId}/query</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+                <div class="api-endpoint">
+                  <span class="api-method post">POST</span>
+                  <span class="api-path">/ontologies/{ontologyId}/nl-query</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+                <div class="api-endpoint">
+                  <span class="api-method get">GET</span>
+                  <span class="api-path">/ontologies/{ontologyId}/objects/{type}</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+
+                <div class="property-section-title mb-3" style="margin-top: var(--space-6);">数据管理</div>
+                <div class="api-endpoint">
+                  <span class="api-method post">POST</span>
+                  <span class="api-path">/ontologies</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+                <div class="api-endpoint">
+                  <span class="api-method put">PUT</span>
+                  <span class="api-path">/ontologies/{ontologyId}</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+                <div class="api-endpoint">
+                  <span class="api-method delete">DELETE</span>
+                  <span class="api-path">/ontologies/{ontologyId}</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+
+                <div class="property-section-title mb-3" style="margin-top: var(--space-6);">数据源</div>
+                <div class="api-endpoint">
+                  <span class="api-method get">GET</span>
+                  <span class="api-path">/datasources</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+                <div class="api-endpoint">
+                  <span class="api-method post">POST</span>
+                  <span class="api-path">/datasources/{datasourceId}/sync</span>
+                  <span class="api-auth">🔑 API Key</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="api-key-card">
+              <div class="api-key-header">
+                <span class="font-semibold">Production API Key</span>
+                <span class="badge badge-success">活跃</span>
+              </div>
+              <div class="api-key-value">
+                <span class="key masked">onto_prod_••••••••••••••••••••••••</span>
+                <button class="btn btn-ghost btn-sm">显示</button>
+                <button class="btn btn-ghost btn-sm">复制</button>
+              </div>
+              <div style="margin-top: var(--space-4);">
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">创建时间</span>
+                  <span>2024-01-15</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">最后使用</span>
+                  <span>5 分钟前</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">今日请求</span>
+                  <span>8,234</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-tertiary">速率限制</span>
+                  <span>5,000 / 分钟</span>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm">重新生成</button>
+                <button class="btn btn-ghost btn-sm">禁用</button>
+              </div>
+            </div>
+
+            <div class="api-key-card mt-4">
+              <div class="api-key-header">
+                <span class="font-semibold">Development API Key</span>
+                <span class="badge badge-info">开发</span>
+              </div>
+              <div class="api-key-value">
+                <span class="key masked">onto_dev_••••••••••••••••••••••••</span>
+                <button class="btn btn-ghost btn-sm">显示</button>
+                <button class="btn btn-ghost btn-sm">复制</button>
+              </div>
+              <div style="margin-top: var(--space-4);">
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">创建时间</span>
+                  <span>2024-01-10</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">最后使用</span>
+                  <span>1 小时前</span>
+                </div>
+                <div class="flex justify-between text-sm mb-2">
+                  <span class="text-tertiary">今日请求</span>
+                  <span>1,234</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                  <span class="text-tertiary">速率限制</span>
+                  <span>1,000 / 分钟</span>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm">重新生成</button>
+                <button class="btn btn-ghost btn-sm">禁用</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

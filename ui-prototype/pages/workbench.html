@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>查询工作台 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .workbench-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr 300px;
+      gap: var(--space-4);
+      height: calc(100vh - var(--header-height) - 80px);
+    }
+    .workbench-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .workbench-panel-header {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .workbench-panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-3);
+    }
+    .workbench-center {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      min-width: 0;
+    }
+    .query-builder {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .query-builder-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .query-builder-tab {
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .query-builder-tab:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .query-builder-tab.active {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--brand-primary);
+    }
+    .visual-builder {
+      padding: var(--space-4);
+    }
+    .vb-canvas {
+      background: var(--bg-input);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      min-height: 200px;
+      padding: var(--space-4);
+    }
+    .vb-node {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-3);
+      background: var(--bg-card);
+      border: 1px solid var(--border-secondary);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      cursor: move;
+      margin: var(--space-1);
+    }
+    .vb-node.selected {
+      border-color: var(--brand-primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .vb-node .node-icon {
+      margin-right: var(--space-2);
+      opacity: 0.7;
+    }
+    .vb-edge {
+      stroke: var(--brand-accent);
+      stroke-width: 2;
+      fill: none;
+    }
+    .vb-operator {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-full);
+      font-size: var(--text-lg);
+      color: var(--text-secondary);
+      margin: 0 var(--space-2);
+    }
+    .result-panel {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .result-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .result-tab {
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .result-tab:hover {
+      color: var(--text-primary);
+    }
+    .result-tab.active {
+      color: var(--brand-primary);
+      border-bottom-color: var(--brand-primary);
+    }
+    .result-body {
+      flex: 1;
+      overflow: auto;
+    }
+    .chart-container {
+      padding: var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+    }
+    .chart-placeholder {
+      width: 200px;
+      height: 150px;
+      background: linear-gradient(180deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: var(--text-sm);
+    }
+    .schema-item {
+      display: flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      font-size: var(--text-sm);
+      margin-bottom: 2px;
+    }
+    .schema-item:hover {
+      background: var(--bg-hover);
+    }
+    .schema-item.selected {
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .schema-item .si-icon {
+      margin-right: var(--space-2);
+      color: var(--text-tertiary);
+    }
+    .schema-item .si-name {
+      flex: 1;
+      color: var(--text-primary);
+    }
+    .schema-item .si-type {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+    }
+    .saved-query-item {
+      padding: var(--space-3);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .saved-query-item:hover {
+      border-color: var(--border-secondary);
+    }
+    .saved-query-item .sq-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      color: var(--text-primary);
+    }
+    .saved-query-item .sq-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: var(--space-1);
+    }
+    .snippet-btn {
+      width: 100%;
+      padding: var(--space-2);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-md);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: left;
+      margin-bottom: var(--space-1);
+      transition: all var(--transition-fast);
+    }
+    .snippet-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    .snippet-btn code {
+      font-family: var(--font-mono);
+      color: var(--brand-accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item active"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">查询工作台</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <select class="form-select" style="width: 160px; height: 32px;">
+            <option>客户360 (v2.1)</option>
+            <option>供应商网络 (v1.3)</option>
+          </select>
+          <button class="btn btn-secondary">保存查询</button>
+          <button class="btn btn-primary">▶ 执行</button>
+        </div>
+      </header>
+
+      <div class="content" style="padding: var(--space-4);">
+        <div class="workbench-layout">
+          <!-- Left Panel: Schema Browser -->
+          <div class="workbench-panel">
+            <div class="workbench-panel-header">
+              <span class="font-semibold text-sm">本体结构</span>
+            </div>
+            <div style="padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-primary);">
+              <div class="search-input" style="width: 100%;">
+                <span class="icon">⌕</span>
+                <input type="text" placeholder="搜索..." style="width: 100%;">
+              </div>
+            </div>
+            <div class="workbench-panel-body">
+              <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2); text-transform: uppercase;">对象类型</div>
+              <div class="schema-item selected">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Customer</span>
+                <span class="si-type">8</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Order</span>
+                <span class="si-type">10</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Product</span>
+                <span class="si-type">8</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Address</span>
+                <span class="si-type">6</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Contact</span>
+                <span class="si-type">7</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Invoice</span>
+                <span class="si-type">9</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Segment</span>
+                <span class="si-type">4</span>
+              </div>
+              <div class="schema-item">
+                <span class="si-icon">◈</span>
+                <span class="si-name">Interaction</span>
+                <span class="si-type">5</span>
+              </div>
+
+              <div style="margin-top: var(--space-4);">
+                <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2); text-transform: uppercase;">关系</div>
+                <div class="schema-item">
+                  <span class="si-icon" style="color: var(--brand-accent);">⇄</span>
+                  <span class="si-name">places</span>
+                  <span class="si-type">Customer→Order</span>
+                </div>
+                <div class="schema-item">
+                  <span class="si-icon" style="color: var(--brand-secondary);">⇄</span>
+                  <span class="si-name">has</span>
+                  <span class="si-type">Customer→Address</span>
+                </div>
+                <div class="schema-item">
+                  <span class="si-icon" style="color: var(--status-warning);">⇄</span>
+                  <span class="si-name">contains</span>
+                  <span class="si-type">Order→Product</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center: Query Builder -->
+          <div class="workbench-center">
+            <div class="query-builder">
+              <div class="query-builder-header">
+                <div class="query-builder-tab active">可视化构建</div>
+                <div class="query-builder-tab">SPARQL 编辑</div>
+                <div class="query-builder-tab">历史记录</div>
+              </div>
+              <div class="visual-builder">
+                <div class="vb-canvas">
+                  <div style="display: flex; align-items: center; flex-wrap: wrap;">
+                    <div class="vb-node selected">
+                      <span class="node-icon">◈</span>
+                      <span>Customer</span>
+                    </div>
+                    <div class="vb-operator">⇄</div>
+                    <div class="vb-node">
+                      <span class="node-icon">◈</span>
+                      <span>Order</span>
+                    </div>
+                    <div class="vb-operator">?</div>
+                    <div class="vb-node" style="border-style: dashed; opacity: 0.6;">
+                      <span class="node-icon">◈</span>
+                      <span>添加节点</span>
+                    </div>
+                  </div>
+                  <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px dashed var(--border-primary);">
+                    <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2);">SELECT</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+                      <div style="display: flex; align-items: center; padding: var(--space-1) var(--space-2); background: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-primary);">Customer.</span>name
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <div style="display: flex; align-items: center; padding: var(--space-1) var(--space-2); background: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-primary);">Customer.</span>tier
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <div style="display: flex; align-items: center; padding: var(--space-1) var(--space-2); background: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-secondary);">Order.</span>totalAmount
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <button style="padding: var(--space-1) var(--space-2); background: transparent; border: 1px dashed var(--border-secondary); border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-tertiary); cursor: pointer;">+ 添加字段</button>
+                    </div>
+                  </div>
+                  <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px dashed var(--border-primary);">
+                    <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2);">WHERE</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;">
+                      <div style="padding: var(--space-1) var(--space-2); background: rgba(59, 130, 246, 0.1); border: 1px solid var(--brand-primary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-primary);">Customer.tier</span> = <span style="color: var(--status-success);">"Gold"</span>
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <div style="padding: var(--space-1) var(--space-2); background: rgba(139, 92, 246, 0.1); border: 1px solid var(--brand-secondary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-secondary);">Order.status</span> = <span style="color: var(--status-success);">"completed"</span>
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <button style="padding: var(--space-1) var(--space-2); background: transparent; border: 1px dashed var(--border-secondary); border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-tertiary); cursor: pointer;">+ 添加条件</button>
+                    </div>
+                  </div>
+                  <div style="margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px dashed var(--border-primary);">
+                    <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2);">ORDER BY</div>
+                    <div style="display: flex; gap: var(--space-2); align-items: center;">
+                      <div style="padding: var(--space-1) var(--space-2); background: var(--bg-tertiary); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                        <span style="color: var(--brand-secondary);">Order.totalAmount</span> <span style="color: var(--text-tertiary);">DESC</span>
+                        <span style="margin-left: var(--space-2); color: var(--text-tertiary); cursor: pointer;">✕</span>
+                      </div>
+                      <button style="padding: var(--space-1) var(--space-2); background: transparent; border: 1px dashed var(--border-secondary); border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-tertiary); cursor: pointer;">+ 添加排序</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Results -->
+            <div class="result-panel">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);">
+                <div class="result-tabs" style="border-bottom: none;">
+                  <div class="result-tab active">表格</div>
+                  <div class="result-tab">JSON</div>
+                  <div class="result-tab">图表</div>
+                </div>
+                <div style="font-size: var(--text-xs); color: var(--text-tertiary);">执行时间: 234ms · 返回 42 条</div>
+              </div>
+              <div class="result-body">
+                <table class="result-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align: left; padding: var(--space-3) var(--space-4);">Customer.name</th>
+                      <th style="text-align: left; padding: var(--space-3) var(--space-4);">Customer.tier</th>
+                      <th style="text-align: right; padding: var(--space-3) var(--space-4);">Order.totalAmount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); color: var(--text-primary);">Apple Inc.</td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);"><span class="badge badge-success">Gold</span></td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); text-align: right; font-family: var(--font-mono); color: var(--status-success);">$2,456,789</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); color: var(--text-primary);">Microsoft Corp.</td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);"><span class="badge badge-success">Gold</span></td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); text-align: right; font-family: var(--font-mono); color: var(--status-success);">$1,892,345</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); color: var(--text-primary);">Amazon.com</td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);"><span class="badge badge-success">Gold</span></td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); text-align: right; font-family: var(--font-mono); color: var(--status-success);">$1,654,230</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); color: var(--text-primary);">Google LLC</td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);"><span class="badge badge-success">Gold</span></td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); text-align: right; font-family: var(--font-mono); color: var(--status-success);">$1,234,567</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); color: var(--text-primary);">Meta Platforms</td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary);"><span class="badge badge-success">Gold</span></td>
+                      <td style="padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-primary); text-align: right; font-family: var(--font-mono); color: var(--status-success);">$987,654</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-primary); display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: var(--text-xs); color: var(--text-tertiary);">显示 1-5 / 共 42 条</div>
+                <div style="display: flex; gap: var(--space-2);">
+                  <button class="btn btn-ghost btn-sm">导出 CSV</button>
+                  <button class="btn btn-ghost btn-sm">导出 JSON</button>
+                  <button class="btn btn-ghost btn-sm">复制查询</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Panel: Saved Queries & Snippets -->
+          <div class="workbench-panel">
+            <div class="workbench-panel-header">
+              <span class="font-semibold text-sm">已保存查询</span>
+            </div>
+            <div class="workbench-panel-body">
+              <div class="saved-query-item">
+                <div class="sq-name">金牌客户订单统计</div>
+                <div class="sq-meta">客户360 · 昨天</div>
+              </div>
+              <div class="saved-query-item">
+                <div class="sq-name">月度销售趋势</div>
+                <div class="sq-meta">客户360 · 3天前</div>
+              </div>
+              <div class="saved-query-item">
+                <div class="sq-name">高价值客户分析</div>
+                <div class="sq-meta">客户360 · 1周前</div>
+              </div>
+
+              <div style="margin-top: var(--space-6);">
+                <div style="font-size: var(--text-xs); color: var(--text-tertiary); margin-bottom: var(--space-2); text-transform: uppercase;">代码片段</div>
+                <button class="snippet-btn"><code>DISTINCT</code> 去重</button>
+                <button class="snippet-btn"><code>COUNT(?x)</code> 计数</button>
+                <button class="snippet-btn"><code>SUM(?val)</code> 求和</button>
+                <button class="snippet-btn"><code>AVG(?val)</code> 平均值</button>
+                <button class="snippet-btn"><code>GROUP BY</code> 分组</button>
+                <button class="snippet-btn"><code>HAVING</code> 分组过滤</button>
+                <button class="snippet-btn"><code>FILTER</code> 条件过滤</button>
+                <button class="snippet-btn"><code>OPTIONAL</code> 可选匹配</button>
+                <button class="snippet-btn"><code>UNION</code> 合并结果</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

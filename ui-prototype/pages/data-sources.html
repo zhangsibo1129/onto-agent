@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据源管理 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .datasource-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      transition: all var(--transition-fast);
+      cursor: pointer;
+    }
+    .datasource-card:hover {
+      border-color: var(--brand-primary);
+      box-shadow: var(--shadow-glow);
+    }
+    .datasource-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    .datasource-card-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .datasource-icon {
+      width: 36px;
+      height: 36px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--brand-primary);
+      font-size: var(--text-lg);
+    }
+    .datasource-name {
+      font-size: var(--text-base);
+      font-weight: var(--font-semibold);
+      color: var(--text-primary);
+    }
+    .datasource-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-primary);
+    }
+    .datasource-meta-item {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .datasource-meta-item span {
+      color: var(--text-secondary);
+      font-weight: var(--font-medium);
+    }
+    .datasource-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item active"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">数据源管理</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="header-search">
+            <span class="search-icon">⌕</span>
+            <input type="text" placeholder="搜索数据源...">
+            <span class="search-shortcut">⌘K</span>
+          </div>
+          <button class="header-icon-btn">◉<span class="badge"></span></button>
+          <button class="header-icon-btn">⚙</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">数据源管理</h1>
+              <p class="page-description">管理 PostgreSQL 数据库连接，自动采集表结构和元数据</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary">⟳ 刷新全部</button>
+              <button class="btn btn-primary" onclick="document.getElementById('addDatasourceModal').classList.add('active')">+ 添加数据源</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">数据源总数</div>
+            <div class="stat-value">3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">连接正常</div>
+            <div class="stat-value" style="color: var(--status-success);">3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">总表数</div>
+            <div class="stat-value">156</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已映射表</div>
+            <div class="stat-value">42</div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="search-input">
+              <span class="icon">⌕</span>
+              <input type="text" placeholder="搜索数据源名称...">
+            </div>
+            <select class="form-select" style="width: 140px;">
+              <option>全部状态</option>
+              <option>已连接</option>
+              <option>连接失败</option>
+            </select>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-ghost btn-sm">卡片视图</button>
+            <button class="btn btn-ghost btn-sm">列表视图</button>
+          </div>
+        </div>
+
+        <div class="datasource-grid">
+          <div class="datasource-card" onclick="window.location.href='datasource-detail.html'">
+            <div class="datasource-card-header">
+              <div class="datasource-card-title">
+                <div class="datasource-icon">⬡</div>
+                <div>
+                  <div class="datasource-name">ERP-Production</div>
+                  <div class="text-xs text-tertiary">PostgreSQL 15.2</div>
+                </div>
+              </div>
+              <span class="badge badge-success">已连接</span>
+            </div>
+            <div class="text-sm text-secondary mb-4">生产环境 ERP 系统主数据库，包含采购、库存、财务模块</div>
+            <div class="datasource-meta">
+              <div class="datasource-meta-item">主机: <span>erp-db.internal:5432</span></div>
+              <div class="datasource-meta-item">数据库: <span>erp_prod</span></div>
+              <div class="datasource-meta-item">表数: <span>68</span></div>
+              <div class="datasource-meta-item">最后同步: <span>5 分钟前</span></div>
+            </div>
+          </div>
+
+          <div class="datasource-card">
+            <div class="datasource-card-header">
+              <div class="datasource-card-title">
+                <div class="datasource-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--brand-secondary);">⬡</div>
+                <div>
+                  <div class="datasource-name">CRM-Main</div>
+                  <div class="text-xs text-tertiary">PostgreSQL 14.8</div>
+                </div>
+              </div>
+              <span class="badge badge-success">已连接</span>
+            </div>
+            <div class="text-sm text-secondary mb-4">客户关系管理系统数据库，包含客户、联系人、商机数据</div>
+            <div class="datasource-meta">
+              <div class="datasource-meta-item">主机: <span>crm-db.internal:5432</span></div>
+              <div class="datasource-meta-item">数据库: <span>crm_main</span></div>
+              <div class="datasource-meta-item">表数: <span>52</span></div>
+              <div class="datasource-meta-item">最后同步: <span>12 分钟前</span></div>
+            </div>
+          </div>
+
+          <div class="datasource-card">
+            <div class="datasource-card-header">
+              <div class="datasource-card-title">
+                <div class="datasource-icon" style="background: rgba(6, 182, 212, 0.1); color: var(--brand-accent);">⬡</div>
+                <div>
+                  <div class="datasource-name">SCM-SupplyChain</div>
+                  <div class="text-xs text-tertiary">PostgreSQL 15.2</div>
+                </div>
+              </div>
+              <span class="badge badge-success">已连接</span>
+            </div>
+            <div class="text-sm text-secondary mb-4">供应链管理数据库，包含供应商、物流、仓储数据</div>
+            <div class="datasource-meta">
+              <div class="datasource-meta-item">主机: <span>scm-db.internal:5432</span></div>
+              <div class="datasource-meta-item">数据库: <span>scm_chain</span></div>
+              <div class="datasource-meta-item">表数: <span>36</span></div>
+              <div class="datasource-meta-item">最后同步: <span>3 分钟前</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add Datasource Modal -->
+  <div class="modal-overlay" id="addDatasourceModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">添加数据源</h3>
+        <button class="modal-close" onclick="document.getElementById('addDatasourceModal').classList.remove('active')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">数据源名称 <span class="required">*</span></label>
+          <input type="text" class="form-input" placeholder="例如：ERP-Production">
+          <div class="form-hint">用于标识此数据源的名称，建议使用环境+系统名</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">主机地址 <span class="required">*</span></label>
+            <input type="text" class="form-input" placeholder="db.example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">端口 <span class="required">*</span></label>
+            <input type="number" class="form-input" value="5432">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">数据库名 <span class="required">*</span></label>
+            <input type="text" class="form-input" placeholder="database_name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Schema</label>
+            <input type="text" class="form-input" value="public" placeholder="public">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">用户名 <span class="required">*</span></label>
+            <input type="text" class="form-input" placeholder="postgres">
+          </div>
+          <div class="form-group">
+            <label class="form-label">密码 <span class="required">*</span></label>
+            <input type="password" class="form-input" placeholder="••••••••">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">描述</label>
+          <textarea class="form-textarea" placeholder="数据源用途说明..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SSL 模式</label>
+          <select class="form-select">
+            <option>prefer</option>
+            <option>require</option>
+            <option>disable</option>
+            <option>verify-ca</option>
+            <option>verify-full</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('addDatasourceModal').classList.remove('active')">取消</button>
+        <button class="btn btn-ghost">测试连接</button>
+        <button class="btn btn-primary">保存并扫描</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

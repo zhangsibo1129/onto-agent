@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OntoAgent - 企业本体数据平台</title>
+  <link rel="stylesheet" href="css/design-system.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <style>
+    /* Dashboard specific styles */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-6);
+    }
+    .activity-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+    .activity-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .activity-content {
+      flex: 1;
+    }
+    .activity-text {
+      font-size: var(--text-sm);
+      color: var(--text-primary);
+    }
+    .activity-time {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      margin-top: var(--space-1);
+    }
+    .quick-action {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+    }
+    .quick-action:hover {
+      border-color: var(--brand-primary);
+      background: var(--bg-hover);
+    }
+    .quick-action .qa-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-3);
+      font-size: var(--text-xl);
+    }
+    .quick-action .qa-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      color: var(--text-primary);
+    }
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="index.html" class="nav-item active">
+            <span class="nav-icon">◉</span>
+            <span>仪表盘</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="pages/data-sources.html" class="nav-item">
+            <span class="nav-icon">⬡</span>
+            <span>数据源</span>
+            <span class="nav-badge">3</span>
+          </a>
+          <a href="pages/ontologies.html" class="nav-item">
+            <span class="nav-icon">◈</span>
+            <span>本体管理</span>
+          </a>
+          <a href="pages/mapping.html" class="nav-item">
+            <span class="nav-icon">⇄</span>
+            <span>数据映射</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="pages/query.html" class="nav-item">
+            <span class="nav-icon">⌘</span>
+            <span>语义查询</span>
+          </a>
+          <a href="pages/nl-query.html" class="nav-item">
+            <span class="nav-icon">◉</span>
+            <span>自然语言查询</span>
+            <span class="nav-badge">AI</span>
+          </a>
+          <a href="pages/workbench.html" class="nav-item">
+            <span class="nav-icon">⚙</span>
+            <span>查询工作台</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="pages/versions.html" class="nav-item">
+            <span class="nav-icon">⧖</span>
+            <span>版本管理</span>
+          </a>
+          <a href="pages/sync.html" class="nav-item">
+            <span class="nav-icon">⟳</span>
+            <span>数据同步</span>
+          </a>
+          <a href="pages/permissions.html" class="nav-item">
+            <span class="nav-icon">⚿</span>
+            <span>权限管理</span>
+          </a>
+          <a href="pages/api-management.html" class="nav-item">
+            <span class="nav-icon">⊞</span>
+            <span>API 管理</span>
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="#">首页</a>
+            <span class="separator">/</span>
+            <span class="current">仪表盘</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="header-search">
+            <span class="search-icon">⌕</span>
+            <input type="text" placeholder="搜索本体、数据源、查询...">
+            <span class="search-shortcut">⌘K</span>
+          </div>
+          <button class="header-icon-btn">
+            ◉
+            <span class="badge"></span>
+          </button>
+          <button class="header-icon-btn">⚙</button>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content">
+        <!-- Page Header -->
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">仪表盘</h1>
+              <p class="page-description">企业本体数据平台运行概览</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary">⟳ 刷新</button>
+              <button class="btn btn-primary">+ 新建本体</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">数据源</div>
+            <div class="stat-value">3</div>
+            <div class="stat-change positive">↑ 全部连接正常</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本体总数</div>
+            <div class="stat-value">5</div>
+            <div class="stat-change positive">↑ 2 个已发布</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">对象类型</div>
+            <div class="stat-value">24</div>
+            <div class="stat-change positive">↑ 较上周 +3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">今日查询</div>
+            <div class="stat-value">1,247</div>
+            <div class="stat-change positive">↑ 12.5% 较昨日</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card mb-6">
+          <div class="card-header">
+            <span class="card-title">快捷操作</span>
+          </div>
+          <div class="card-body">
+            <div class="quick-actions-grid">
+              <a href="pages/data-sources.html" class="quick-action">
+                <div class="qa-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--brand-primary);">⬡</div>
+                <span class="qa-title">连接数据源</span>
+              </a>
+              <a href="pages/ontologies.html" class="quick-action">
+                <div class="qa-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--brand-secondary);">◈</div>
+                <span class="qa-title">创建本体</span>
+              </a>
+              <a href="pages/query.html" class="quick-action">
+                <div class="qa-icon" style="background: rgba(6, 182, 212, 0.1); color: var(--brand-accent);">⌘</div>
+                <span class="qa-title">语义查询</span>
+              </a>
+              <a href="pages/nl-query.html" class="quick-action">
+                <div class="qa-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--status-success);">◉</div>
+                <span class="qa-title">AI 对话查询</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two Column Layout -->
+        <div class="dashboard-grid">
+          <!-- Recent Ontologies -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">最近本体</span>
+              <a href="pages/ontologies.html" class="btn btn-ghost btn-sm">查看全部 →</a>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>状态</th>
+                    <th>对象数</th>
+                    <th>更新时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="cell-primary">客户360</td>
+                    <td><span class="badge badge-published">已发布</span></td>
+                    <td>8</td>
+                    <td class="text-tertiary">2 小时前</td>
+                  </tr>
+                  <tr>
+                    <td class="cell-primary">供应商网络</td>
+                    <td><span class="badge badge-published">已发布</span></td>
+                    <td>6</td>
+                    <td class="text-tertiary">昨天</td>
+                  </tr>
+                  <tr>
+                    <td class="cell-primary">订单全景</td>
+                    <td><span class="badge badge-draft">草稿</span></td>
+                    <td>5</td>
+                    <td class="text-tertiary">3 天前</td>
+                  </tr>
+                  <tr>
+                    <td class="cell-primary">库存管理</td>
+                    <td><span class="badge badge-draft">草稿</span></td>
+                    <td>3</td>
+                    <td class="text-tertiary">5 天前</td>
+                  </tr>
+                  <tr>
+                    <td class="cell-primary">财务分析</td>
+                    <td><span class="badge badge-archived">已归档</span></td>
+                    <td>2</td>
+                    <td class="text-tertiary">2 周前</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">最近活动</span>
+              <button class="btn btn-ghost btn-sm">筛选</button>
+            </div>
+            <div class="card-body">
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--status-success);"></div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>客户360</strong> 本体已发布 v2.1</div>
+                  <div class="activity-time">2 小时前 · Admin</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--brand-primary);"></div>
+                <div class="activity-content">
+                  <div class="activity-text">新增数据源 <strong>ERP-Production</strong></div>
+                  <div class="activity-time">3 小时前 · Admin</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--brand-secondary);"></div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>订单全景</strong> 新增对象类型 ReturnOrder</div>
+                  <div class="activity-time">昨天 · Zhang San</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--brand-accent);"></div>
+                <div class="activity-content">
+                  <div class="activity-text">执行自然语言查询 <strong>"显示上月高价值客户"</strong></div>
+                  <div class="activity-time">昨天 · Li Si</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--status-warning);"></div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>供应商网络</strong> 数据同步完成，处理 12,450 条记录</div>
+                  <div class="activity-time">2 天前 · 系统</div>
+                </div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background: var(--text-tertiary);"></div>
+                <div class="activity-content">
+                  <div class="activity-text"><strong>财务分析</strong> 本体已归档</div>
+                  <div class="activity-time">2 周前 · Admin</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

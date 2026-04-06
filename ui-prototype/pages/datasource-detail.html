@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数据源详情 - ERP-Production - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .datasource-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .datasource-icon-lg {
+      width: 56px;
+      height: 56px;
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-2xl);
+      color: var(--brand-primary);
+    }
+    .datasource-info h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-bold);
+      margin-bottom: var(--space-1);
+    }
+    .connection-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+      background: var(--status-success);
+    }
+    .table-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+    }
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .table-card:hover {
+      border-color: var(--brand-primary);
+      box-shadow: var(--shadow-glow);
+    }
+    .table-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+    .table-card-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+    }
+    .table-card-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-2);
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .table-card-meta span {
+      color: var(--text-secondary);
+    }
+    .table-card-tags {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border-primary);
+    }
+    .column-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .column-item {
+      display: flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-3);
+      border-bottom: 1px solid var(--border-primary);
+      font-size: var(--text-sm);
+    }
+    .column-item:last-child {
+      border-bottom: none;
+    }
+    .column-item .ci-name {
+      flex: 1;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+    .column-item .ci-type {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      margin-right: var(--space-3);
+    }
+    .column-item .ci-key {
+      font-size: var(--text-xs);
+      color: var(--status-warning);
+    }
+    .column-item .ci-pk {
+      font-size: var(--text-xs);
+      color: var(--brand-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item active"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <a href="data-sources.html">数据源</a>
+            <span class="separator">/</span>
+            <span class="current">ERP-Production</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-ghost">测试连接</button>
+          <button class="btn btn-secondary">编辑</button>
+          <button class="btn btn-primary">⟳ 重新扫描</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="datasource-header">
+          <div class="datasource-icon-lg">⬡</div>
+          <div class="datasource-info">
+            <h2>ERP-Production</h2>
+            <div class="connection-badge">
+              <div class="connection-dot"></div>
+              <span class="text-sm text-success">已连接</span>
+              <span class="text-sm text-tertiary">·</span>
+              <span class="text-sm text-secondary">PostgreSQL 15.2</span>
+              <span class="text-sm text-tertiary">·</span>
+              <span class="text-sm text-secondary">erp-db.internal:5432</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: var(--space-6);">
+          <div class="stat-card">
+            <div class="stat-label">总表数</div>
+            <div class="stat-value">68</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已映射表</div>
+            <div class="stat-value" style="color: var(--status-success);">24</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">总记录数</div>
+            <div class="stat-value">~2.4M</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">最后同步</div>
+            <div class="stat-value text-sm">5 分钟前</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: var(--space-4);">
+          <div class="card-header">
+            <span class="card-title">连接信息</span>
+          </div>
+          <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4);">
+              <div>
+                <div class="text-xs text-tertiary mb-1">主机地址</div>
+                <div class="text-sm mono">erp-db.internal</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">端口</div>
+                <div class="text-sm mono">5432</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">数据库</div>
+                <div class="text-sm mono">erp_prod</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">Schema</div>
+                <div class="text-sm mono">public</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">用户名</div>
+                <div class="text-sm mono">ontoagent_ro</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">SSL 模式</div>
+                <div class="text-sm">prefer</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">连接池</div>
+                <div class="text-sm">5-20 连接</div>
+              </div>
+              <div>
+                <div class="text-xs text-tertiary mb-1">超时设置</div>
+                <div class="text-sm">30 秒</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">数据库表 (68)</span>
+            <div style="display: flex; gap: var(--space-3);">
+              <div class="search-input">
+                <span class="icon">⌕</span>
+                <input type="text" placeholder="搜索表名..." style="width: 200px;">
+              </div>
+              <select class="form-select" style="width: 140px;">
+                <option>全部</option>
+                <option>已映射</option>
+                <option>未映射</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-grid">
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">customers</span>
+                  <span class="badge badge-success">已映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>15</span></div>
+                  <div>行数: <span>12,450</span></div>
+                  <div>映射: <span>客户360</span></div>
+                  <div>更新: <span>1小时前</span></div>
+                </div>
+                <div class="table-card-tags">
+                  <span class="badge badge-draft">主键: customer_id</span>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">orders</span>
+                  <span class="badge badge-success">已映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>18</span></div>
+                  <div>行数: <span>156,789</span></div>
+                  <div>映射: <span>订单全景</span></div>
+                  <div>更新: <span>30分钟前</span></div>
+                </div>
+                <div class="table-card-tags">
+                  <span class="badge badge-draft">主键: order_id</span>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">products</span>
+                  <span class="badge badge-success">已映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>12</span></div>
+                  <div>行数: <span>3,456</span></div>
+                  <div>映射: <span>订单全景</span></div>
+                  <div>更新: <span>2小时前</span></div>
+                </div>
+                <div class="table-card-tags">
+                  <span class="badge badge-draft">主键: product_id</span>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">invoices</span>
+                  <span class="badge badge-success">已映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>20</span></div>
+                  <div>行数: <span>89,234</span></div>
+                  <div>映射: <span>客户360</span></div>
+                  <div>更新: <span>1小时前</span></div>
+                </div>
+                <div class="table-card-tags">
+                  <span class="badge badge-draft">主键: invoice_id</span>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">addresses</span>
+                  <span class="badge badge-info">部分映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>10</span></div>
+                  <div>行数: <span>23,567</span></div>
+                  <div>映射: <span>6/10 列</span></div>
+                  <div>更新: <span>3小时前</span></div>
+                </div>
+                <div class="table-card-tags">
+                  <span class="badge badge-draft">主键: address_id</span>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">contacts</span>
+                  <span class="badge badge-warning">未映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>14</span></div>
+                  <div>行数: <span>34,567</span></div>
+                  <div>映射: <span>-</span></div>
+                  <div>更新: <span>1天前</span></div>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">inventory</span>
+                  <span class="badge badge-warning">未映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>16</span></div>
+                  <div>行数: <span>45,678</span></div>
+                  <div>映射: <span>-</span></div>
+                  <div>更新: <span>2天前</span></div>
+                </div>
+              </div>
+
+              <div class="table-card">
+                <div class="table-card-header">
+                  <span class="table-card-name">shipments</span>
+                  <span class="badge badge-warning">未映射</span>
+                </div>
+                <div class="table-card-meta">
+                  <div>列数: <span>11</span></div>
+                  <div>行数: <span>67,890</span></div>
+                  <div>映射: <span>-</span></div>
+                  <div>更新: <span>5天前</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table Detail Modal -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <span class="card-title">customers 表结构</span>
+            <div class="flex gap-2">
+              <button class="btn btn-ghost btn-sm">查看数据</button>
+              <button class="btn btn-ghost btn-sm">映射到本体</button>
+            </div>
+          </div>
+          <div class="column-list">
+            <div class="column-item">
+              <span class="ci-name">customer_id</span>
+              <span class="ci-type">uuid</span>
+              <span class="ci-pk">PK</span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">customer_name</span>
+              <span class="ci-type">varchar(255)</span>
+              <span class="ci-key">NN</span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">email_address</span>
+              <span class="ci-type">varchar(255)</span>
+              <span class="ci-key">UQ</span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">phone_number</span>
+              <span class="ci-type">varchar(50)</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">customer_tier</span>
+              <span class="ci-type">varchar(20)</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">lifetime_value</span>
+              <span class="ci-type">numeric(15,2)</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">industry_code</span>
+              <span class="ci-type">varchar(10)</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">created_at</span>
+              <span class="ci-type">timestamp</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">updated_at</span>
+              <span class="ci-type">timestamp</span>
+              <span></span>
+            </div>
+            <div class="column-item">
+              <span class="ci-name">status</span>
+              <span class="ci-type">varchar(20)</span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

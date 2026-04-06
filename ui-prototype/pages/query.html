@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>语义查询 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .query-layout {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - var(--header-height) - 80px);
+      gap: var(--space-4);
+    }
+    .query-top-bar {
+      display: flex;
+      gap: var(--space-4);
+      align-items: flex-end;
+    }
+    .query-editor-area {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .query-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .query-editor-tabs {
+      display: flex;
+      gap: var(--space-1);
+    }
+    .query-editor-tab {
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-xs);
+      font-weight: var(--font-medium);
+      color: var(--text-tertiary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    .query-editor-tab:hover {
+      color: var(--text-secondary);
+      background: var(--bg-hover);
+    }
+    .query-editor-tab.active {
+      color: var(--brand-primary);
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .query-textarea {
+      flex: 1;
+      background: var(--bg-input);
+      border: none;
+      padding: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      line-height: var(--leading-relaxed);
+      color: var(--text-primary);
+      resize: none;
+      outline: none;
+    }
+    .query-textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+    .query-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      border-top: 1px solid var(--border-primary);
+      background: var(--bg-tertiary);
+    }
+    .query-info {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .query-result-area {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .query-result-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .query-result-tab {
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all var(--transition-fast);
+    }
+    .query-result-tab:hover {
+      color: var(--text-primary);
+    }
+    .query-result-tab.active {
+      color: var(--brand-primary);
+      border-bottom-color: var(--brand-primary);
+    }
+    .query-result-body {
+      flex: 1;
+      overflow: auto;
+    }
+    .result-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .result-table th {
+      background: var(--bg-tertiary);
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      font-size: var(--text-xs);
+      font-weight: var(--font-semibold);
+      color: var(--text-tertiary);
+      border-bottom: 1px solid var(--border-primary);
+      position: sticky;
+      top: 0;
+      white-space: nowrap;
+    }
+    .result-table td {
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      border-bottom: 1px solid var(--border-primary);
+      color: var(--text-secondary);
+    }
+    .result-table tbody tr:hover {
+      background: var(--bg-hover);
+    }
+    .query-history {
+      width: 280px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .query-history-header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-primary);
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
+    }
+    .query-history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-2);
+    }
+    .query-history-item {
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-bottom: var(--space-1);
+    }
+    .query-history-item:hover {
+      background: var(--bg-hover);
+    }
+    .query-history-item .qhi-query {
+      font-size: var(--text-xs);
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: var(--space-1);
+    }
+    .query-history-item .qhi-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+      display: flex;
+      justify-content: space-between;
+    }
+    .syntax-keyword { color: #c678dd; }
+    .syntax-variable { color: #e06c75; }
+    .syntax-string { color: #98c379; }
+    .syntax-type { color: #e5c07b; }
+    .syntax-comment { color: #5c6370; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item active"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">语义查询</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <select class="form-select" style="width: 160px; height: 32px;">
+            <option>客户360 (v2.1)</option>
+            <option>供应商网络 (v1.3)</option>
+          </select>
+          <button class="header-icon-btn">⚙</button>
+        </div>
+      </header>
+
+      <div class="content" style="padding: var(--space-4);">
+        <div class="query-layout">
+          <div class="flex gap-4" style="flex: 1; min-height: 0;">
+            <div class="query-editor-area" style="flex: 1;">
+              <div class="query-editor-header">
+                <div class="query-editor-tabs">
+                  <div class="query-editor-tab active">SPARQL</div>
+                  <div class="query-editor-tab">可视化构建</div>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm">格式化</button>
+                  <button class="btn btn-ghost btn-sm">清除</button>
+                  <button class="btn btn-ghost btn-sm">保存查询</button>
+                </div>
+              </div>
+              <textarea class="query-textarea" spellcheck="false">PREFIX onto: <http://ontoagent.com/ontology#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+# 查询所有金牌客户及其订单总额
+SELECT ?customerName ?email ?totalOrders ?totalAmount
+WHERE {
+  ?customer rdf:type onto:Customer ;
+            onto:name ?customerName ;
+            onto:email ?email ;
+            onto:tier "Gold" ;
+            onto:lifetimeValue ?totalAmount .
+  
+  {
+    SELECT ?customer (COUNT(?order) AS ?totalOrders)
+    WHERE {
+      ?customer onto:places ?order .
+      ?order rdf:type onto:Order .
+    }
+    GROUP BY ?customer
+  }
+  
+  FILTER(?totalAmount > 100000)
+}
+ORDER BY DESC(?totalAmount)
+LIMIT 50</textarea>
+              <div class="query-footer">
+                <div class="query-info">
+                  <span>本体: 客户360 v2.1</span>
+                  <span style="margin-left: var(--space-4);">行数: 24</span>
+                  <span style="margin-left: var(--space-4);">上次执行: 2.3s · 返回 42 条</span>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm">解释查询</button>
+                  <button class="btn btn-primary">▶ 执行查询</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="query-history">
+              <div class="query-history-header">查询历史</div>
+              <div class="query-history-list">
+                <div class="query-history-item">
+                  <div class="qhi-query">SELECT ?name ?tier WHERE { ?c rdf:type onto:Customer ... }</div>
+                  <div class="qhi-meta">
+                    <span>42 条结果</span>
+                    <span>2 分钟前</span>
+                  </div>
+                </div>
+                <div class="query-history-item">
+                  <div class="qhi-query">SELECT ?order ?total WHERE { ?o rdf:type onto:Order ... }</div>
+                  <div class="qhi-meta">
+                    <span>128 条结果</span>
+                    <span>15 分钟前</span>
+                  </div>
+                </div>
+                <div class="query-history-item">
+                  <div class="qhi-query">ASK { ?c rdf:type onto:Customer ; onto:tier "Platinum" }</div>
+                  <div class="qhi-meta">
+                    <span>false</span>
+                    <span>1 小时前</span>
+                  </div>
+                </div>
+                <div class="query-history-item">
+                  <div class="qhi-query">SELECT ?product ?count WHERE { ?p rdf:type onto:Product ... }</div>
+                  <div class="qhi-meta">
+                    <span>86 条结果</span>
+                    <span>3 小时前</span>
+                  </div>
+                </div>
+                <div class="query-history-item">
+                  <div class="qhi-query">CONSTRUCT { ?c onto:has ?a } WHERE { ?c onto:hasAddress ?a }</div>
+                  <div class="qhi-meta">
+                    <span>图查询</span>
+                    <span>昨天</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Query Results -->
+          <div class="query-result-area">
+            <div class="query-result-tabs">
+              <div class="query-result-tab active">表格结果 (42)</div>
+              <div class="query-result-tab">JSON</div>
+              <div class="query-result-tab">图表</div>
+              <div class="query-result-tab">执行计划</div>
+            </div>
+            <div class="query-result-body">
+              <table class="result-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>customerName</th>
+                    <th>email</th>
+                    <th>totalOrders</th>
+                    <th>totalAmount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">1</td>
+                    <td class="cell-primary">Apple Inc.</td>
+                    <td class="mono">procurement@apple.com</td>
+                    <td>1,247</td>
+                    <td class="mono" style="color: var(--status-success);">$2,456,789.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">2</td>
+                    <td class="cell-primary">Microsoft Corp.</td>
+                    <td class="mono">orders@microsoft.com</td>
+                    <td>986</td>
+                    <td class="mono" style="color: var(--status-success);">$1,892,345.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">3</td>
+                    <td class="cell-primary">Amazon.com</td>
+                    <td class="mono">vendor-relations@amazon.com</td>
+                    <td>2,103</td>
+                    <td class="mono" style="color: var(--status-success);">$1,654,230.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">4</td>
+                    <td class="cell-primary">Google LLC</td>
+                    <td class="mono">purchasing@google.com</td>
+                    <td>756</td>
+                    <td class="mono" style="color: var(--status-success);">$1,234,567.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">5</td>
+                    <td class="cell-primary">Meta Platforms</td>
+                    <td class="mono">supply@meta.com</td>
+                    <td>543</td>
+                    <td class="mono" style="color: var(--status-success);">$987,654.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">6</td>
+                    <td class="cell-primary">Tesla Inc.</td>
+                    <td class="mono">procurement@tesla.com</td>
+                    <td>432</td>
+                    <td class="mono" style="color: var(--status-success);">$876,543.00</td>
+                  </tr>
+                  <tr>
+                    <td class="mono" style="color: var(--text-tertiary);">7</td>
+                    <td class="cell-primary">Netflix Inc.</td>
+                    <td class="mono">vendor@netflix.com</td>
+                    <td>321</td>
+                    <td class="mono" style="color: var(--status-success);">$654,321.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination" style="padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-primary);">
+              <div class="pagination-info">显示 1-7 / 共 42 条</div>
+              <div class="pagination-buttons">
+                <button class="pagination-btn" disabled>‹</button>
+                <button class="pagination-btn active">1</button>
+                <button class="pagination-btn">2</button>
+                <button class="pagination-btn">3</button>
+                <button class="pagination-btn">...</button>
+                <button class="pagination-btn">6</button>
+                <button class="pagination-btn">›</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

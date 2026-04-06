@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>版本管理 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .version-timeline {
+      position: relative;
+      padding-left: var(--space-8);
+    }
+    .version-timeline::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border-primary);
+    }
+    .version-item {
+      position: relative;
+      padding-bottom: var(--space-6);
+    }
+    .version-item:last-child {
+      padding-bottom: 0;
+    }
+    .version-dot {
+      position: absolute;
+      left: calc(-1 * var(--space-8) + 8px);
+      top: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: var(--radius-full);
+      border: 3px solid;
+    }
+    .version-dot.published {
+      border-color: var(--status-success);
+      background: var(--status-success);
+    }
+    .version-dot.draft {
+      border-color: var(--text-tertiary);
+      background: var(--bg-primary);
+    }
+    .version-dot.archived {
+      border-color: var(--status-archived);
+      background: var(--status-archived);
+    }
+    .version-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      transition: all var(--transition-fast);
+    }
+    .version-card:hover {
+      border-color: var(--border-secondary);
+    }
+    .version-card.current {
+      border-color: var(--brand-primary);
+      box-shadow: var(--shadow-glow);
+    }
+    .version-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-3);
+    }
+    .version-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .version-tag {
+      font-size: var(--text-base);
+      font-weight: var(--font-semibold);
+      color: var(--text-primary);
+    }
+    .version-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--text-tertiary);
+    }
+    .version-desc {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-4);
+    }
+    .version-changes {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+    }
+    .version-change {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-xs);
+      padding: var(--space-1) 0;
+      color: var(--text-secondary);
+    }
+    .version-change .vc-icon {
+      width: 16px;
+      text-align: center;
+    }
+    .version-change.added .vc-icon { color: var(--status-success); }
+    .version-change.modified .vc-icon { color: var(--status-info); }
+    .version-change.removed .vc-icon { color: var(--status-error); }
+    .version-actions {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+    }
+    .version-stats {
+      display: flex;
+      gap: var(--space-6);
+      margin-top: var(--space-3);
+    }
+    .version-stat {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .version-stat span {
+      color: var(--text-secondary);
+      font-weight: var(--font-medium);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item active"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">版本管理</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <select class="form-select" style="width: 160px; height: 32px;">
+            <option>客户360</option>
+            <option>供应商网络</option>
+            <option>订单全景</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">版本管理</h1>
+              <p class="page-description">管理本体版本生命周期：草稿 → 发布 → 归档</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary">比较版本</button>
+              <button class="btn btn-primary">+ 新建草稿</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">当前版本</div>
+            <div class="stat-value" style="color: var(--status-success);">v2.1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">草稿版本</div>
+            <div class="stat-value">1</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已发布版本</div>
+            <div class="stat-value">3</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已归档版本</div>
+            <div class="stat-value">1</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">版本历史 - 客户360</span>
+          </div>
+          <div class="card-body">
+            <div class="version-timeline">
+              <!-- Draft Version -->
+              <div class="version-item">
+                <div class="version-dot draft"></div>
+                <div class="version-card">
+                  <div class="version-header">
+                    <div class="version-title">
+                      <span class="version-tag">v2.2-draft</span>
+                      <span class="badge badge-draft">草稿</span>
+                    </div>
+                    <span class="text-xs text-tertiary">编辑中</span>
+                  </div>
+                  <div class="version-desc">正在添加 Interaction 对象类型和新的关系映射</div>
+                  <div class="version-stats">
+                    <div class="version-stat">对象类型: <span>9</span></div>
+                    <div class="version-stat">属性: <span>68</span></div>
+                    <div class="version-stat">关系: <span>15</span></div>
+                  </div>
+                  <div class="version-actions">
+                    <button class="btn btn-primary btn-sm">发布</button>
+                    <button class="btn btn-secondary btn-sm">查看差异</button>
+                    <button class="btn btn-ghost btn-sm">放弃草稿</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Current Published -->
+              <div class="version-item">
+                <div class="version-dot published"></div>
+                <div class="version-card current">
+                  <div class="version-header">
+                    <div class="version-title">
+                      <span class="version-tag">v2.1</span>
+                      <span class="badge badge-published">已发布</span>
+                      <span class="badge badge-info" style="background: rgba(59, 130, 246, 0.1); color: var(--brand-primary);">当前版本</span>
+                    </div>
+                    <span class="text-xs text-tertiary">2024-01-15 14:30</span>
+                  </div>
+                  <div class="version-desc">新增 Customer 分段属性，优化 Order 关系映射</div>
+                  <div class="version-changes">
+                    <div class="version-change added">
+                      <span class="vc-icon">+</span>
+                      <span>新增对象类型 Segment</span>
+                    </div>
+                    <div class="version-change added">
+                      <span class="vc-icon">+</span>
+                      <span>Customer 新增 segmentId 属性</span>
+                    </div>
+                    <div class="version-change modified">
+                      <span class="vc-icon">~</span>
+                      <span>修改 Customer→Order 关系基数 1:N → 1:*</span>
+                    </div>
+                    <div class="version-change modified">
+                      <span class="vc-icon">~</span>
+                      <span>更新 Order.totalAmount 映射表达式</span>
+                    </div>
+                  </div>
+                  <div class="version-stats">
+                    <div class="version-stat">对象类型: <span>8</span></div>
+                    <div class="version-stat">属性: <span>64</span></div>
+                    <div class="version-stat">关系: <span>14</span></div>
+                  </div>
+                  <div class="version-actions">
+                    <button class="btn btn-secondary btn-sm">查看快照</button>
+                    <button class="btn btn-ghost btn-sm">回滚到此版本</button>
+                    <button class="btn btn-ghost btn-sm">导出 OWL</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Previous Published -->
+              <div class="version-item">
+                <div class="version-dot published"></div>
+                <div class="version-card">
+                  <div class="version-header">
+                    <div class="version-title">
+                      <span class="version-tag">v2.0</span>
+                      <span class="badge badge-published">已发布</span>
+                    </div>
+                    <span class="text-xs text-tertiary">2024-01-08 10:15</span>
+                  </div>
+                  <div class="version-desc">重大更新：重构 Customer 对象，添加 Invoice 和 Contact 对象</div>
+                  <div class="version-changes">
+                    <div class="version-change added">
+                      <span class="vc-icon">+</span>
+                      <span>新增对象类型 Invoice</span>
+                    </div>
+                    <div class="version-change added">
+                      <span class="vc-icon">+</span>
+                      <span>新增对象类型 Contact</span>
+                    </div>
+                    <div class="version-change modified">
+                      <span class="vc-icon">~</span>
+                      <span>重构 Customer 属性结构</span>
+                    </div>
+                  </div>
+                  <div class="version-stats">
+                    <div class="version-stat">对象类型: <span>7</span></div>
+                    <div class="version-stat">属性: <span>58</span></div>
+                    <div class="version-stat">关系: <span>11</span></div>
+                  </div>
+                  <div class="version-actions">
+                    <button class="btn btn-secondary btn-sm">查看快照</button>
+                    <button class="btn btn-ghost btn-sm">回滚到此版本</button>
+                    <button class="btn btn-ghost btn-sm">比较差异</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- v1.0 -->
+              <div class="version-item">
+                <div class="version-dot published"></div>
+                <div class="version-card">
+                  <div class="version-header">
+                    <div class="version-title">
+                      <span class="version-tag">v1.0</span>
+                      <span class="badge badge-published">已发布</span>
+                    </div>
+                    <span class="text-xs text-tertiary">2023-12-20 09:00</span>
+                  </div>
+                  <div class="version-desc">初始版本：Customer、Order、Product、Address 四个对象类型</div>
+                  <div class="version-stats">
+                    <div class="version-stat">对象类型: <span>4</span></div>
+                    <div class="version-stat">属性: <span>32</span></div>
+                    <div class="version-stat">关系: <span>5</span></div>
+                  </div>
+                  <div class="version-actions">
+                    <button class="btn btn-secondary btn-sm">查看快照</button>
+                    <button class="btn btn-ghost btn-sm">导出 OWL</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Archived -->
+              <div class="version-item">
+                <div class="version-dot archived"></div>
+                <div class="version-card" style="opacity: 0.7;">
+                  <div class="version-header">
+                    <div class="version-title">
+                      <span class="version-tag">v0.9-beta</span>
+                      <span class="badge badge-archived">已归档</span>
+                    </div>
+                    <span class="text-xs text-tertiary">2023-12-10 16:45</span>
+                  </div>
+                  <div class="version-desc">测试版本，已归档</div>
+                  <div class="version-actions">
+                    <button class="btn btn-ghost btn-sm">查看快照</button>
+                    <button class="btn btn-ghost btn-sm">恢复</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>权限管理 - OntoAgent</title>
+  <link rel="stylesheet" href="../css/design-system.css">
+  <style>
+    .permission-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: var(--space-4);
+    }
+    .permission-sidebar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .permission-sidebar-header {
+      padding: var(--space-4);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .permission-list {
+      padding: var(--space-2);
+    }
+    .permission-item {
+      display: flex;
+      align-items: center;
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      margin-bottom: 2px;
+    }
+    .permission-item:hover {
+      background: var(--bg-hover);
+    }
+    .permission-item.active {
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .permission-item-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: var(--space-3);
+      font-size: var(--text-sm);
+    }
+    .permission-item-info {
+      flex: 1;
+    }
+    .permission-item-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-medium);
+      color: var(--text-primary);
+    }
+    .permission-item-meta {
+      font-size: var(--text-xs);
+      color: var(--text-tertiary);
+    }
+    .permission-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .permission-content-header {
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--border-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .permission-matrix {
+      padding: var(--space-4);
+    }
+    .permission-matrix table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .permission-matrix th {
+      background: var(--bg-tertiary);
+      padding: var(--space-3);
+      text-align: left;
+      font-size: var(--text-xs);
+      font-weight: var(--font-semibold);
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    .permission-matrix td {
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--border-primary);
+      font-size: var(--text-sm);
+    }
+    .permission-matrix tbody tr:hover {
+      background: var(--bg-hover);
+    }
+    .permission-checkbox {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .permission-checkbox input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--brand-primary);
+    }
+    .permission-ontology {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .permission-ontology-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-xs);
+    }
+    .role-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      font-weight: var(--font-medium);
+    }
+    .role-badge.admin {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--status-error);
+    }
+    .role-badge.editor {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--brand-primary);
+    }
+    .role-badge.viewer {
+      background: rgba(100, 116, 139, 0.1);
+      color: var(--text-tertiary);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">O</div>
+        <span class="logo-text">OntoAgent</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">概览</div>
+          <a href="../index.html" class="nav-item"><span class="nav-icon">◉</span><span>仪表盘</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">数据管理</div>
+          <a href="data-sources.html" class="nav-item"><span class="nav-icon">⬡</span><span>数据源</span><span class="nav-badge">3</span></a>
+          <a href="ontologies-list.html" class="nav-item"><span class="nav-icon">◈</span><span>本体管理</span></a>
+          <a href="mapping.html" class="nav-item"><span class="nav-icon">⇄</span><span>数据映射</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">查询与分析</div>
+          <a href="query.html" class="nav-item"><span class="nav-icon">⌘</span><span>语义查询</span></a>
+          <a href="nl-query.html" class="nav-item"><span class="nav-icon">◉</span><span>自然语言查询</span><span class="nav-badge">AI</span></a>
+          <a href="workbench.html" class="nav-item"><span class="nav-icon">⚙</span><span>查询工作台</span></a>
+        </div>
+        <div class="nav-section">
+          <div class="nav-section-title">系统</div>
+          <a href="versions.html" class="nav-item"><span class="nav-icon">⧖</span><span>版本管理</span></a>
+          <a href="sync.html" class="nav-item"><span class="nav-icon">⟳</span><span>数据同步</span></a>
+          <a href="permissions.html" class="nav-item active"><span class="nav-icon">⚿</span><span>权限管理</span></a>
+          <a href="api-management.html" class="nav-item"><span class="nav-icon">⊞</span><span>API 管理</span></a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name">Admin</div>
+          <div class="user-role">系统管理员</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-left">
+          <div class="header-breadcrumb">
+            <a href="../index.html">首页</a>
+            <span class="separator">/</span>
+            <span class="current">权限管理</span>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="btn btn-secondary">导出权限</button>
+          <button class="btn btn-primary">+ 新建角色</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="page-header">
+          <div class="page-header-top">
+            <div>
+              <h1 class="page-title">权限管理</h1>
+              <p class="page-description">管理用户、角色和本体访问权限</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
+          <div class="stat-card">
+            <div class="stat-label">用户总数</div>
+            <div class="stat-value">24</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">管理员</div>
+            <div class="stat-value">2</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">编辑者</div>
+            <div class="stat-value">8</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">查看者</div>
+            <div class="stat-value">14</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">API 密钥</div>
+            <div class="stat-value">6</div>
+          </div>
+        </div>
+
+        <div class="tabs mb-4">
+          <div class="tab active">用户权限</div>
+          <div class="tab">角色管理</div>
+          <div class="tab">API 密钥</div>
+          <div class="tab">审计日志</div>
+        </div>
+
+        <div class="permission-grid">
+          <div class="permission-sidebar">
+            <div class="permission-sidebar-header">
+              <span class="font-semibold text-sm">用户</span>
+              <button class="btn btn-ghost btn-sm">+ 邀请用户</button>
+            </div>
+            <div style="padding: var(--space-3);">
+              <div class="search-input" style="width: 100%;">
+                <span class="icon">⌕</span>
+                <input type="text" placeholder="搜索用户..." style="width: 100%;">
+              </div>
+            </div>
+            <div class="permission-list">
+              <div class="permission-item active">
+                <div class="permission-item-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--status-error);">A</div>
+                <div class="permission-item-info">
+                  <div class="permission-item-name">Admin</div>
+                  <div class="permission-item-meta">admin@company.com</div>
+                </div>
+                <span class="role-badge admin">管理员</span>
+              </div>
+              <div class="permission-item">
+                <div class="permission-item-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--brand-primary);">Z</div>
+                <div class="permission-item-info">
+                  <div class="permission-item-name">Zhang San</div>
+                  <div class="permission-item-meta">zhangsan@company.com</div>
+                </div>
+                <span class="role-badge editor">编辑者</span>
+              </div>
+              <div class="permission-item">
+                <div class="permission-item-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--brand-secondary);">L</div>
+                <div class="permission-item-info">
+                  <div class="permission-item-name">Li Si</div>
+                  <div class="permission-item-meta">lisi@company.com</div>
+                </div>
+                <span class="role-badge editor">编辑者</span>
+              </div>
+              <div class="permission-item">
+                <div class="permission-item-icon" style="background: rgba(100, 116, 139, 0.1); color: var(--text-tertiary);">W</div>
+                <div class="permission-item-info">
+                  <div class="permission-item-name">Wang Wu</div>
+                  <div class="permission-item-meta">wangwu@company.com</div>
+                </div>
+                <span class="role-badge viewer">查看者</span>
+              </div>
+              <div class="permission-item">
+                <div class="permission-item-icon" style="background: rgba(100, 116, 139, 0.1); color: var(--text-tertiary);">Z</div>
+                <div class="permission-item-info">
+                  <div class="permission-item-name">Zhao Liu</div>
+                  <div class="permission-item-meta">zhaoliu@company.com</div>
+                </div>
+                <span class="role-badge viewer">查看者</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="permission-content">
+            <div class="permission-content-header">
+              <div>
+                <span class="font-semibold text-base">Admin</span>
+                <span class="text-sm text-tertiary" style="margin-left: var(--space-2);">admin@company.com</span>
+              </div>
+              <button class="btn btn-secondary btn-sm">编辑权限</button>
+            </div>
+            <div class="permission-matrix">
+              <div style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-4);">
+                设置用户对各本体的访问权限
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>本体</th>
+                    <th style="text-align: center;">读取</th>
+                    <th style="text-align: center;">写入</th>
+                    <th style="text-align: center;">发布</th>
+                    <th style="text-align: center;">删除</th>
+                    <th style="text-align: center;">管理</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="permission-ontology">
+                        <div class="permission-ontology-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--brand-primary);">C</div>
+                        <span>客户360</span>
+                      </div>
+                    </td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="permission-ontology">
+                        <div class="permission-ontology-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--brand-secondary);">S</div>
+                        <span>供应商网络</span>
+                      </div>
+                    </td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="permission-ontology">
+                        <div class="permission-ontology-icon" style="background: rgba(6, 182, 212, 0.1); color: var(--brand-accent);">O</div>
+                        <span>订单全景</span>
+                      </div>
+                    </td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="permission-ontology">
+                        <div class="permission-ontology-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--status-success);">I</div>
+                        <span>库存管理</span>
+                      </div>
+                    </td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                    <td class="permission-checkbox"><input type="checkbox" checked disabled></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="divider"></div>
+
+            <div style="padding: 0 var(--space-4) var(--space-4);">
+              <div class="property-section-title" style="margin-bottom: var(--space-3);">其他权限</div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                  <div>
+                    <div class="text-sm font-medium">管理数据源</div>
+                    <div class="text-xs text-tertiary">添加、编辑、删除数据源连接</div>
+                  </div>
+                  <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--brand-primary);">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                  <div>
+                    <div class="text-sm font-medium">管理用户</div>
+                    <div class="text-xs text-tertiary">邀请、编辑、删除平台用户</div>
+                  </div>
+                  <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--brand-primary);">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                  <div>
+                    <div class="text-sm font-medium">查看审计日志</div>
+                    <div class="text-xs text-tertiary">查看平台操作和查询日志</div>
+                  </div>
+                  <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--brand-primary);">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-3); background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                  <div>
+                    <div class="text-sm font-medium">导出本体</div>
+                    <div class="text-xs text-tertiary">导出 OWL/RDF 格式本体文件</div>
+                  </div>
+                  <input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--brand-primary);">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -54,21 +54,20 @@ export default function NLQuery() {
   }
 
   return (
-    <div className="nl-query-container">
-      <div className="nl-ontology-selector">
-        <select
-          className="form-select"
-          value={selectedOntology}
-          onChange={(e) => setSelectedOntology(e.target.value)}
-          style={{ width: 200 }}
-        >
-          {ontologies.map((ontology) => (
-            <option key={ontology} value={ontology}>{ontology}</option>
-          ))}
-        </select>
-      </div>
-
       <div className="chat-area">
+        <div className="chat-header">
+          <div className="chat-ontology-select">
+            <select
+              className="form-select"
+              value={selectedOntology}
+              onChange={(e) => setSelectedOntology(e.target.value)}
+            >
+              {ontologies.map((ontology) => (
+                <option key={ontology} value={ontology}>{ontology}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="chat-messages">
           {chatMessages.map((msg, index) => (
             <div key={index} className={`chat-msg ${msg.type}`}>
@@ -136,6 +135,5 @@ export default function NLQuery() {
           </div>
         </div>
       </div>
-    </div>
   )
 }

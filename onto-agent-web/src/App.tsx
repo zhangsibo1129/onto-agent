@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { AppLayout } from "@/components/layout"
 import Dashboard from "@/pages/Dashboard"
+import DataSources from "@/pages/DataSources"
 import Placeholder from "@/pages/Placeholder"
 
 function App() {
@@ -9,7 +10,7 @@ function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/data-sources" element={<Placeholder title="数据源管理" />} />
+          <Route path="/data-sources" element={<DataSources />} />
           <Route path="/data-sources/:id" element={<Placeholder title="数据源详情" />} />
           <Route path="/ontologies" element={<Placeholder title="本体列表" />} />
           <Route path="/ontologies/:id" element={<Placeholder title="本体建模" />} />

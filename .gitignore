@@ -3,6 +3,12 @@ node_modules/
 bower_components/
 vendor/
 
+# onto-agent-web
+onto-agent-web/node_modules/
+onto-agent-web/dist/
+onto-agent-web/.DS_Store
+onto-agent-web/*.local
+
 # Build outputs
 dist/
 build/

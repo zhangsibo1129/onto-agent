@@ -184,15 +184,15 @@ export default function DatasourceDetail() {
                 </div>
                 <div className="column-table">
                   <div className="column-table-header">
-                    <span style={{ flex: 2 }}>列名</span>
-                    <span style={{ flex: 1 }}>类型</span>
-                    <span style={{ flex: 0, width: 60 }}>键</span>
+                    <span>列名</span>
+                    <span>类型</span>
+                    <span>键</span>
                   </div>
                   {currentColumns.map((col) => (
                     <div key={col.name} className="column-table-row">
-                      <span style={{ flex: 2 }} className="col-name">{col.name}</span>
-                      <span style={{ flex: 1 }} className="col-type">{col.type}</span>
-                      <span style={{ flex: 0, width: 60 }}>
+                      <span className="col-name">{col.name}</span>
+                      <span className="col-type">{col.type}</span>
+                      <span>
                         {col.key && (
                           <span className={`badge ${col.key === "PK" ? "badge-primary" : col.key === "FK" ? "badge-secondary" : "badge-draft"}`}>
                             {col.key}

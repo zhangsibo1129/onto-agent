@@ -78,6 +78,15 @@
   background: transparent;
   cursor: pointer;
   transition: all var(--transition-fast);
+  padding: var(--space-5);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.add-card:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .add-card:hover {

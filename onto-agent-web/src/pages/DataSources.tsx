@@ -295,10 +295,10 @@ export default function DataSources() {
       </div>
 
       <div className="datasource-grid">
-        <div className="datasource-card add-card" onClick={() => setShowModal(true)}>
+        <button className="datasource-card add-card" onClick={() => setShowModal(true)}>
           <div className="add-icon">+</div>
           <div className="add-text">添加数据源</div>
-        </div>
+        </button>
         {loading ? (
           <div className="datasource-card" style={{ opacity: 0.5 }}>
             <div className="text-sm text-tertiary">加载中...</div>

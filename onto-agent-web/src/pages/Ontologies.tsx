@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { mockOntologies } from "@/data/mock"
 import "./Ontologies.css"
@@ -13,81 +14,78 @@ const colorMap: Record<number, { bg: string; color: string }> = {
 const statusBadgeClass: Record<string, string> = {
   published: "badge badge-published",
   draft: "badge badge-draft",
-  archived: "badge badge-archived",
 }
 
 const statusText: Record<string, string> = {
   published: "已发布",
   draft: "草稿",
-  archived: "已归档",
 }
 
 export default function Ontologies() {
   const navigate = useNavigate()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("全部状态")
 
   const publishedCount = mockOntologies.filter((o) => o.status === "published").length
-  const draftCount = mockOntologies.filter((o) => o.status === "draft").length
-  const archivedCount = mockOntologies.filter((o) => o.status === "archived").length
+
+  const filteredOntologies = mockOntologies.filter((o) => {
+    const matchesSearch = o.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus =
+      statusFilter === "全部状态" ||
+      statusText[o.status] === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm("确定要删除这个本体吗？")) return
+    alert(`删除本体 ${id} 功能开发中`)
+  }
 
   return (
     <>
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--space-6)" }}>
-        <div className="stat-card">
-          <div className="stat-label">本体总数</div>
-          <div className="stat-value">{mockOntologies.length}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">已发布</div>
-          <div className="stat-value" style={{ color: "var(--status-success)" }}>{publishedCount}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">草稿</div>
-          <div className="stat-value" style={{ color: "var(--text-tertiary)" }}>{draftCount}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">已归档</div>
-          <div className="stat-value" style={{ color: "var(--text-tertiary)" }}>{archivedCount}</div>
-        </div>
-      </div>
-
-      <div className="toolbar">
+      <div className="toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="toolbar-left">
           <div className="search-input">
             <span className="icon">⌕</span>
-            <input type="text" placeholder="搜索本体名称..." />
+            <input
+              type="text"
+              placeholder="搜索本体名称..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <select className="form-select" style={{ width: 120 }}>
+          <select
+            className="form-select"
+            style={{ width: 120 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
             <option>全部状态</option>
             <option>已发布</option>
             <option>草稿</option>
-            <option>已归档</option>
-          </select>
-          <select className="form-select" style={{ width: 140 }}>
-            <option>全部数据源</option>
-            <option>ERP-Production</option>
-            <option>CRM-Main</option>
-            <option>SCM-SupplyChain</option>
           </select>
         </div>
-        <div className="toolbar-right">
-          <button className="btn btn-ghost btn-sm">卡片视图</button>
-          <button className="btn btn-ghost btn-sm">列表视图</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: publishedCount > 0 ? "var(--status-success)" : "var(--status-error)" }}></span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              {publishedCount}/{mockOntologies.length}
+            </span>
+          </span>
+          <button className="btn btn-primary btn-sm" onClick={() => alert("创建本体功能开发中...")}>+ 添加本体</button>
         </div>
       </div>
 
       <div className="ontology-grid">
-        <div className="ontology-card add-card" onClick={() => alert("创建本体功能开发中...")}>
-          <div className="add-icon">+</div>
-          <div className="add-text">创建本体</div>
-        </div>
-        {mockOntologies.map((ontology) => (
+        {filteredOntologies.map((ontology) => (
           <div
             key={ontology.id}
-            className={`ontology-card ${ontology.status === "archived" ? "archived" : ""}`}
+            className="ontology-card"
             onClick={() => navigate(`/ontologies/${ontology.id}`)}
           >
             <div className="ontology-card-header">
-              <div className="ontology-card-title-row">
+              <div className="ontology-card-title">
                 <div
                   className="ontology-card-icon"
                   style={{
@@ -97,39 +95,30 @@ export default function Ontologies() {
                 >
                   {ontology.initial}
                 </div>
-                <div className="ontology-card-info">
-                  <div className="ontology-card-name">{ontology.name}</div>
-                  <div className="ontology-card-desc">{ontology.description}</div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <div className="ontology-card-name">{ontology.name}</div>
+                    <span className={statusBadgeClass[ontology.status]}>
+                      {statusText[ontology.status]}
+                    </span>
+                  </div>
+                  <div className="text-xs text-tertiary">{ontology.version}</div>
                 </div>
               </div>
-              <span className={statusBadgeClass[ontology.status]}>
-                {statusText[ontology.status]}
-              </span>
-            </div>
-            <div className="ontology-card-body">
-              <div className="ontology-card-stats">
-                <div className="ontology-stat">
-                  <div className="ontology-stat-value">{ontology.objectCount}</div>
-                  <div className="ontology-stat-label">对象类型</div>
-                </div>
-                <div className="ontology-stat">
-                  <div className="ontology-stat-value">{ontology.propertyCount}</div>
-                  <div className="ontology-stat-label">属性</div>
-                </div>
-                <div className="ontology-stat">
-                  <div className="ontology-stat-value">{ontology.relationCount}</div>
-                  <div className="ontology-stat-label">关系</div>
-                </div>
+              <div className="ontology-card-actions">
+                <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); alert("编辑功能开发中") }} title="编辑">✎</button>
+                <button className="btn btn-ghost btn-sm" onClick={(e) => handleDelete(e, ontology.id)} title="删除">✕</button>
               </div>
             </div>
-            <div className="ontology-card-footer">
-              <div className="ontology-card-version">
-                {ontology.version} · <span>{ontology.datasource}</span> · 更新于 {ontology.updatedAt}
-              </div>
-              <div className="ontology-card-footer-buttons">
-                <button className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>查询</button>
-                <button className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>编辑</button>
-              </div>
+            <div className="ontology-card-description">
+              {ontology.description || "暂无描述"}
+            </div>
+            <div className="ontology-card-meta">
+              <span>对象: {ontology.objectCount}</span>
+              <span>·</span>
+              <span>属性: {ontology.propertyCount}</span>
+              <span>·</span>
+              <span>关系: {ontology.relationCount}</span>
             </div>
           </div>
         ))}

@@ -236,6 +236,7 @@ export default function DataSources() {
         <div className="toolbar-right">
           <button className="btn btn-ghost btn-sm">卡片视图</button>
           <button className="btn btn-ghost btn-sm">列表视图</button>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ 添加数据源</button>
         </div>
       </div>
 

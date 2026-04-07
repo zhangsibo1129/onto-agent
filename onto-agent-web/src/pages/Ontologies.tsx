@@ -122,7 +122,7 @@ export default function Ontologies() {
               <div className="ontology-card-version">
                 {ontology.version} · <span>{ontology.datasource}</span> · 更新于 {ontology.updatedAt}
               </div>
-              <div className="flex gap-2">
+              <div className="ontology-card-footer-buttons">
                 <button className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>查询</button>
                 <button className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>编辑</button>
               </div>

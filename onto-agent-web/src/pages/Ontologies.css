@@ -89,13 +89,16 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  overflow: hidden;
 }
 
 .ontology-card-version {
   font-size: var(--text-xs);
   color: var(--text-tertiary);
-  flex-shrink: 0;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ontology-card-version span {

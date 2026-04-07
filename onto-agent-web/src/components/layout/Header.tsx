@@ -78,16 +78,22 @@ export function Header() {
     <header className="header">
       <div className="header-left">
         <div className="header-breadcrumb">
-          {breadcrumbs.map((crumb, index) => (
-            <span key={index}>
-              {crumb.href ? (
-                <Link to={crumb.href}>{crumb.label}</Link>
-              ) : (
-                <span className={index === breadcrumbs.length - 1 ? "current" : ""}>{crumb.label}</span>
-              )}
-              {index < breadcrumbs.length - 1 && <span className="separator">/</span>}
-            </span>
-          ))}
+          {breadcrumbs.flatMap((crumb, index) => {
+            const items = []
+            items.push(
+              <span key={`item-${index}`}>
+                {crumb.href ? (
+                  <Link to={crumb.href}>{crumb.label}</Link>
+                ) : (
+                  <span className={index === breadcrumbs.length - 1 ? "current" : ""}>{crumb.label}</span>
+                )}
+              </span>
+            )
+            if (index < breadcrumbs.length - 1) {
+              items.push(<span key={`sep-${index}`} className="separator">/</span>)
+            }
+            return items
+          })}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { datasourceApi } from "@/services/datasourceApi"
 import type { Datasource } from "@/services/datasourceApi"
 import "./DataSources.css"
@@ -50,6 +50,7 @@ type ConnectionStatus = "idle" | "testing" | "success" | "error"
 
 export default function DataSources() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>(initialFormData)
@@ -66,6 +67,17 @@ export default function DataSources() {
   useEffect(() => {
     loadDatasources()
   }, [])
+
+  useEffect(() => {
+    const editId = location.state?.editId as string | undefined
+    if (editId) {
+      const ds = datasources.find(d => d.id === editId)
+      if (ds) {
+        handleOpenEdit(ds)
+      }
+      navigate(location.pathname, { replace: true })
+    }
+  }, [location.state, datasources])
 
   const loadDatasources = async () => {
     try {
@@ -116,8 +128,8 @@ export default function DataSources() {
       database: ds.database || "",
       schema: ds.schema || "public",
       username: ds.username || "",
-      password: ds.password || "",
-      description: "",
+      password: "",
+      description: ds.description || "",
       sslMode: ds.sslMode || "prefer",
     })
     setConnectionStatus("idle")
@@ -220,6 +232,7 @@ export default function DataSources() {
           username: formData.username,
           password: formData.password || undefined,
           sslMode: formData.sslMode,
+          description: formData.description || undefined,
         })
         setDatasources(datasources.map(ds => ds.id === editingId ? savedDs : ds))
         setSaveMessage("数据源更新成功！")
@@ -234,6 +247,7 @@ export default function DataSources() {
           username: formData.username,
           password: formData.password,
           sslMode: formData.sslMode,
+          description: formData.description || undefined,
         })
         const testResult = await datasourceApi.test(savedDs.id)
         savedDs = {
@@ -298,7 +312,7 @@ export default function DataSources() {
 
   return (
     <>
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="stat-card">
           <div className="stat-label">数据源总数</div>
           <div className="stat-value">{loading ? "-" : datasources.length}</div>
@@ -396,6 +410,7 @@ export default function DataSources() {
               <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
                 {ds.status === "connected" ? "已连接" : "连接失败"}
               </span>
+              {ds.description && <div className="text-sm text-secondary mb-2">{ds.description}</div>}
               <div className="datasource-meta">
                 <div className="datasource-meta-item">
                   主机: <span>{ds.host ? `${ds.host}:${ds.port}` : "-"}</span>

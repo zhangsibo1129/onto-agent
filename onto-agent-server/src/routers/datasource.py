@@ -33,6 +33,7 @@ def datasource_to_dict(ds: Datasource) -> dict:
         "schema": ds.schema,
         "username": ds.username,
         "sslMode": ds.ssl_mode,
+        "description": ds.description,
         "lastSyncAt": ds.last_sync_at.isoformat() if ds.last_sync_at else None,
         "createdAt": ds.created_at.isoformat(),
         "updatedAt": ds.updated_at.isoformat(),
@@ -76,6 +77,7 @@ async def create_datasource(
         username=dump.get("username"),
         password=dump.get("password"),
         ssl_mode=dump.get("ssl_mode"),
+        description=dump.get("description"),
         status="disconnected",
         table_count=0,
     )

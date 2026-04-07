@@ -12,6 +12,7 @@ export interface Datasource {
   username: string | null
   password?: string | null
   sslMode: string | null
+  description?: string | null
   tableCount: number
   lastSyncAt: string | null
   createdAt: string
@@ -28,6 +29,7 @@ export interface CreateDatasourceDto {
   username?: string
   password?: string
   sslMode?: string
+  description?: string
 }
 
 export interface TestConnectionDto {
@@ -51,6 +53,7 @@ export interface UpdateDatasourceDto {
   username?: string
   password?: string
   sslMode?: string
+  description?: string
 }
 
 export interface TableInfo {

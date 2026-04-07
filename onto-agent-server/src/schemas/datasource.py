@@ -14,6 +14,7 @@ class DatasourceBase(CamelCaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_mode: Optional[str] = None
+    description: Optional[str] = None
 
 
 class DatasourceCreate(DatasourceBase):
@@ -30,6 +31,7 @@ class DatasourceUpdate(CamelCaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_mode: Optional[str] = None
+    description: Optional[str] = None
 
 
 class DatasourceResponse(CamelCaseModel):
@@ -44,6 +46,7 @@ class DatasourceResponse(CamelCaseModel):
     db_schema: Optional[str] = Field(default=None, alias="schema")
     username: Optional[str] = None
     ssl_mode: Optional[str] = None
+    description: Optional[str] = None
     last_sync_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

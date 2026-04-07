@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { datasourceApi } from "@/services/datasourceApi"
 import type { Datasource, TableInfo, ColumnInfo } from "@/services/datasourceApi"
 
 export default function DatasourceDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [datasource, setDatasource] = useState<Datasource | null>(null)
   const [tables, setTables] = useState<TableInfo[]>([])
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
@@ -122,7 +123,7 @@ export default function DatasourceDetail() {
           )}
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
-          <button className="btn btn-secondary btn-sm">编辑</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/datasources', { state: { editId: id } })}>编辑</button>
           <button className="btn btn-primary btn-sm" onClick={handleScan} disabled={loadingTables || datasource?.status !== "connected"}>
             {loadingTables ? "同步中..." : "同步"}
           </button>
@@ -155,6 +156,17 @@ export default function DatasourceDetail() {
           </div>
         </div>
       </div>
+
+      {datasource?.description && (
+        <div className="card" style={{ marginBottom: "var(--space-4)" }}>
+          <div className="card-header">
+            <span className="card-title">描述</span>
+          </div>
+          <div className="card-body">
+            <div className="text-sm">{datasource.description}</div>
+          </div>
+        </div>
+      )}
 
       <div className="detail-layout">
         <div className="detail-left">

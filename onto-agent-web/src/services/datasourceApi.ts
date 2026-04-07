@@ -30,6 +30,17 @@ export interface CreateDatasourceDto {
   sslMode?: string
 }
 
+export interface TestConnectionDto {
+  type: string
+  host?: string
+  port?: number
+  database?: string
+  schema?: string
+  username?: string
+  password?: string
+  sslMode?: string
+}
+
 export interface UpdateDatasourceDto {
   name?: string
   type?: string
@@ -113,6 +124,12 @@ export const datasourceApi = {
 
   delete: (id: string) =>
     request<void>(`/datasources/${id}`, { method: "DELETE" }),
+
+  testConnection: (dto: TestConnectionDto) =>
+    request<TestResult>("/datasources/test-connection", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    }),
 
   test: (id: string) => request<TestResult>(`/datasources/${id}/test`),
 

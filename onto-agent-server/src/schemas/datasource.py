@@ -65,6 +65,17 @@ class TestResult(BaseModel):
     error: Optional[str] = None
 
 
+class TestConnectionRequest(BaseModel):
+    type: str = Field(..., min_length=1, max_length=50)
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    username: Optional[str] = None
+    password: Optional[str] = None
+    ssl_mode: Optional[str] = None
+
+
 class ApiResponse(BaseModel):
     success: bool = True
     data: Optional[dict] = None

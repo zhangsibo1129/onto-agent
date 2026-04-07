@@ -136,10 +136,19 @@ export default function DataSources() {
     setConnectionMessage("")
 
     try {
-      const result = await datasourceApi.test("temp-test")
+      const result = await datasourceApi.testConnection({
+        type: formData.type,
+        host: formData.host,
+        port: parseInt(formData.port),
+        database: formData.database,
+        schema: formData.schema || undefined,
+        username: formData.username,
+        password: formData.password,
+        sslMode: formData.sslMode,
+      })
       if (result.connected) {
         setConnectionStatus("success")
-        setConnectionMessage(`连接成功！延迟: ${result.latency}`)
+        setConnectionMessage(`连接成功！延迟: ${result.latency || "N/A"}`)
       } else {
         setConnectionStatus("error")
         setConnectionMessage(`连接失败: ${result.error}`)

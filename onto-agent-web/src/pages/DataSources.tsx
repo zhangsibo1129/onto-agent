@@ -1,19 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { mockDataSources } from "@/data/mock"
+import { datasourceApi } from "@/services/datasourceApi"
+import type { Datasource } from "@/services/datasourceApi"
 import "./DataSources.css"
-
-interface DataSource {
-  id: string
-  name: string
-  type: string
-  status: string
-  host: string
-  database: string
-  tableCount: number
-  lastSync: string
-  description: string
-}
 
 const iconColors: Record<string, { bg: string; color: string }> = {
   "ERP-Production": { bg: "rgba(59, 130, 246, 0.1)", color: "var(--brand-primary)" },
@@ -23,6 +12,7 @@ const iconColors: Record<string, { bg: string; color: string }> = {
 
 interface FormData {
   name: string
+  type: string
   host: string
   port: string
   database: string
@@ -35,6 +25,7 @@ interface FormData {
 
 interface FormErrors {
   name?: string
+  type?: string
   host?: string
   port?: string
   database?: string
@@ -44,6 +35,7 @@ interface FormErrors {
 
 const initialFormData: FormData = {
   name: "",
+  type: "postgresql",
   host: "",
   port: "5432",
   database: "",
@@ -65,9 +57,26 @@ export default function DataSources() {
   const [connectionMessage, setConnectionMessage] = useState("")
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle")
   const [saveMessage, setSaveMessage] = useState("")
-  const [datasources, setDatasources] = useState<DataSource[]>(mockDataSources)
+  const [datasources, setDatasources] = useState<Datasource[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("全部状态")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadDatasources()
+  }, [])
+
+  const loadDatasources = async () => {
+    try {
+      setLoading(true)
+      const data = await datasourceApi.list()
+      setDatasources(data)
+    } catch (error) {
+      console.error("Failed to load datasources:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -94,6 +103,9 @@ export default function DataSources() {
 
     if (!formData.name.trim()) {
       newErrors.name = "请输入数据源名称"
+    }
+    if (!formData.type) {
+      newErrors.type = "请选择数据库类型"
     }
     if (!formData.host.trim()) {
       newErrors.host = "请输入主机地址"
@@ -123,15 +135,18 @@ export default function DataSources() {
     setConnectionStatus("testing")
     setConnectionMessage("")
 
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    const success = Math.random() > 0.3
-    if (success) {
-      setConnectionStatus("success")
-      setConnectionMessage("连接成功！")
-    } else {
+    try {
+      const result = await datasourceApi.test("temp-test")
+      if (result.connected) {
+        setConnectionStatus("success")
+        setConnectionMessage(`连接成功！延迟: ${result.latency}`)
+      } else {
+        setConnectionStatus("error")
+        setConnectionMessage(`连接失败: ${result.error}`)
+      }
+    } catch (error: any) {
       setConnectionStatus("error")
-      setConnectionMessage("连接失败：请检查主机地址和端口是否正确")
+      setConnectionMessage(`连接失败: ${error.message}`)
     }
   }
 
@@ -141,38 +156,46 @@ export default function DataSources() {
     setSaveStatus("saving")
     setSaveMessage("")
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const newDs = await datasourceApi.create({
+        name: formData.name,
+        type: formData.type as "postgresql" | "mysql" | "sqlserver" | "oracle",
+        host: formData.host,
+        port: parseInt(formData.port),
+        database: formData.database,
+        schema: formData.schema || undefined,
+        username: formData.username,
+        password: formData.password,
+        sslMode: formData.sslMode,
+      })
 
-    const success = Math.random() > 0.2
-    if (success) {
       setSaveStatus("success")
       setSaveMessage("数据源创建成功！正在扫描表结构...")
-
-      const newDs: DataSource = {
-        id: `ds-${Date.now()}`,
-        name: formData.name,
-        type: "PostgreSQL",
-        description: formData.description || `数据源 ${formData.name}`,
-        status: "connected",
-        host: formData.host,
-        database: formData.database,
-        tableCount: Math.floor(Math.random() * 50) + 10,
-        lastSync: "刚刚",
-      }
 
       setDatasources([...datasources, newDs])
 
       setTimeout(() => {
         handleCloseModal()
+        loadDatasources()
       }, 1500)
-    } else {
+    } catch (error: any) {
       setSaveStatus("error")
-      setSaveMessage("保存失败：请稍后重试")
+      setSaveMessage(`保存失败: ${error.message}`)
     }
   }
 
   const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData({ ...formData, [field]: value })
+    const newFormData = { ...formData, [field]: value }
+    if (field === "type") {
+      const defaultPorts: Record<string, string> = {
+        postgresql: "5432",
+        mysql: "3306",
+        sqlserver: "1433",
+        oracle: "1521",
+      }
+      newFormData.port = defaultPorts[value] || "5432"
+    }
+    setFormData(newFormData)
     if (errors[field as keyof FormErrors]) {
       setErrors({ ...errors, [field]: undefined })
     }
@@ -190,24 +213,47 @@ export default function DataSources() {
   const totalTables = datasources.reduce((sum, ds) => sum + ds.tableCount, 0)
   const connectedCount = datasources.filter((ds) => ds.status === "connected").length
 
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      postgresql: "PostgreSQL",
+      mysql: "MySQL",
+      sqlserver: "SQL Server",
+      oracle: "Oracle",
+    }
+    return labels[type] || type
+  }
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "从未"
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return "刚刚"
+    if (minutes < 60) return `${minutes}分钟前`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}小时前`
+    return date.toLocaleDateString("zh-CN")
+  }
+
   return (
     <>
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">数据源总数</div>
-          <div className="stat-value">{datasources.length}</div>
+          <div className="stat-value">{loading ? "-" : datasources.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">连接正常</div>
-          <div className="stat-value" style={{ color: "var(--status-success)" }}>{connectedCount}</div>
+          <div className="stat-value" style={{ color: "var(--status-success)" }}>{loading ? "-" : connectedCount}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">总表数</div>
-          <div className="stat-value">{totalTables}</div>
+          <div className="stat-value">{loading ? "-" : totalTables}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">已映射表</div>
-          <div className="stat-value">42</div>
+          <div className="stat-value">-</div>
         </div>
       </div>
 
@@ -244,49 +290,55 @@ export default function DataSources() {
           <div className="add-icon">+</div>
           <div className="add-text">添加数据源</div>
         </div>
-        {filteredDatasources.map((ds) => (
-          <div
-            key={ds.id}
-            className="datasource-card"
-            onClick={() => navigate(`/data-sources/${ds.id}`)}
-          >
-            <div className="datasource-card-header">
-              <div className="datasource-card-title">
-                <div
-                  className="datasource-icon"
-                  style={{
-                    background: iconColors[ds.name]?.bg,
-                    color: iconColors[ds.name]?.color,
-                  }}
-                >
-                  ⬡
-                </div>
-                <div>
-                  <div className="datasource-name">{ds.name}</div>
-                  <div className="text-xs text-tertiary">{ds.type}</div>
-                </div>
-              </div>
-              <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
-                {ds.status === "connected" ? "已连接" : "连接失败"}
-              </span>
-            </div>
-            <div className="text-sm text-secondary mb-4">{ds.description}</div>
-            <div className="datasource-meta">
-              <div className="datasource-meta-item">
-                主机: <span>{ds.host}</span>
-              </div>
-              <div className="datasource-meta-item">
-                数据库: <span>{ds.database}</span>
-              </div>
-              <div className="datasource-meta-item">
-                表数: <span>{ds.tableCount}</span>
-              </div>
-              <div className="datasource-meta-item">
-                最后同步: <span>{ds.lastSync}</span>
-              </div>
-            </div>
+        {loading ? (
+          <div className="datasource-card" style={{ opacity: 0.5 }}>
+            <div className="text-sm text-tertiary">加载中...</div>
           </div>
-        ))}
+        ) : (
+          filteredDatasources.map((ds) => (
+            <div
+              key={ds.id}
+              className="datasource-card"
+              onClick={() => navigate(`/data-sources/${ds.id}`)}
+            >
+              <div className="datasource-card-header">
+                <div className="datasource-card-title">
+                  <div
+                    className="datasource-icon"
+                    style={{
+                      background: iconColors[ds.name]?.bg,
+                      color: iconColors[ds.name]?.color,
+                    }}
+                  >
+                    ⬡
+                  </div>
+                  <div>
+                    <div className="datasource-name">{ds.name}</div>
+                    <div className="text-xs text-tertiary">{getTypeLabel(ds.type)}</div>
+                  </div>
+                </div>
+                <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
+                  {ds.status === "connected" ? "已连接" : "连接失败"}
+                </span>
+              </div>
+              <div className="text-sm text-secondary mb-4">{ds.database || "-"}</div>
+              <div className="datasource-meta">
+                <div className="datasource-meta-item">
+                  主机: <span>{ds.host || "-"}</span>
+                </div>
+                <div className="datasource-meta-item">
+                  数据库: <span>{ds.database || "-"}</span>
+                </div>
+                <div className="datasource-meta-item">
+                  表数: <span>{ds.tableCount}</span>
+                </div>
+                <div className="datasource-meta-item">
+                  最后同步: <span>{formatDate(ds.lastSyncAt)}</span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {showModal && (
@@ -308,6 +360,20 @@ export default function DataSources() {
                 />
                 {errors.name && <div className="form-error">{errors.name}</div>}
                 <div className="form-hint">用于标识此数据源的名称，建议使用环境+系统名</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">数据库类型 <span className="required">*</span></label>
+                <select
+                  className={`form-select ${errors.type ? "error" : ""}`}
+                  value={formData.type}
+                  onChange={(e) => handleInputChange("type", e.target.value)}
+                >
+                  <option value="postgresql">PostgreSQL</option>
+                  <option value="mysql">MySQL</option>
+                  <option value="sqlserver">SQL Server</option>
+                  <option value="oracle">Oracle</option>
+                </select>
+                {errors.type && <div className="form-error">{errors.type}</div>}
               </div>
               <div className="form-row">
                 <div className="form-group">

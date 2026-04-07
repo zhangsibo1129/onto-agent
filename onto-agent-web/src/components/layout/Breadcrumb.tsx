@@ -30,7 +30,7 @@ export function Breadcrumb({ items }: BreadcrumbProps) {
 
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
-  "/data-sources": "数据源管理",
+  "/data-sources": "数据接入",
   "/ontologies": "本体列表",
   "/mapping": "数据映射",
   "/query": "语义查询",
@@ -60,7 +60,7 @@ function getDefaultBreadcrumb(pathname: string): BreadcrumbItem[] {
   if (pathname.startsWith("/data-sources/") && pathname !== "/data-sources") {
     return [
       { label: "首页", href: "/" },
-      { label: "数据源管理", href: "/data-sources" },
+      { label: "数据接入", href: "/data-sources" },
       { label: "详情" },
     ]
   }

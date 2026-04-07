@@ -4,7 +4,7 @@ import "./Header.css"
 
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
-  "/data-sources": "数据源管理",
+  "/data-sources": "数据接入",
   "/ontologies": "本体管理",
   "/mapping": "数据映射",
   "/query": "语义查询",
@@ -34,8 +34,8 @@ function getBreadcrumb(pathname: string) {
   if (pathname.startsWith("/data-sources/")) {
     return [
       { label: "首页", href: "/" },
-      { label: "数据源管理", href: "/data-sources" },
-      { label: "数据源详情" },
+      { label: "数据接入", href: "/data-sources" },
+      { label: "详情" },
     ]
   }
 

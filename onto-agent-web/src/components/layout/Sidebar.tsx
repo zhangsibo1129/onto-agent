@@ -11,7 +11,7 @@ const navItems = [
   {
     section: "数据管理",
     items: [
-      { label: "数据源", icon: "⬡", path: "/data-sources", badge: "3" },
+      { label: "数据接入", icon: "⬡", path: "/data-sources" },
       { label: "本体管理", icon: "◈", path: "/ontologies" },
       { label: "数据映射", icon: "⇄", path: "/mapping" },
     ],

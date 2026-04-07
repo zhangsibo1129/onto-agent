@@ -236,11 +236,14 @@ export default function DataSources() {
         <div className="toolbar-right">
           <button className="btn btn-ghost btn-sm">卡片视图</button>
           <button className="btn btn-ghost btn-sm">列表视图</button>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ 添加数据源</button>
         </div>
       </div>
 
       <div className="datasource-grid">
+        <div className="datasource-card add-card" onClick={() => setShowModal(true)}>
+          <div className="add-icon">+</div>
+          <div className="add-text">添加数据源</div>
+        </div>
         {filteredDatasources.map((ds) => (
           <div
             key={ds.id}

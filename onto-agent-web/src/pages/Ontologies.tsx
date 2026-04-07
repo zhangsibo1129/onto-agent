@@ -76,6 +76,10 @@ export default function Ontologies() {
       </div>
 
       <div className="ontology-grid">
+        <div className="ontology-card add-card" onClick={() => alert("创建本体功能开发中...")}>
+          <div className="add-icon">+</div>
+          <div className="add-text">创建本体</div>
+        </div>
         {mockOntologies.map((ontology) => (
           <div
             key={ontology.id}

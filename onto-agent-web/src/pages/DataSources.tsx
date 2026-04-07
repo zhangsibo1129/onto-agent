@@ -295,16 +295,17 @@ export default function DataSources() {
       </div>
 
       <div className="datasource-grid">
-        <div
+        <button
+          type="button"
           className="datasource-card add-card"
-          onClick={() => setShowModal(true)}
-          onKeyDown={(e) => e.key === 'Enter' && setShowModal(true)}
-          role="button"
-          tabIndex={0}
+          onClick={() => {
+            console.log("Add card clicked!")
+            setShowModal(true)
+          }}
         >
           <div className="add-icon">+</div>
           <div className="add-text">添加数据源</div>
-        </div>
+        </button>
         {loading ? (
           <div className="datasource-card" style={{ opacity: 0.5 }}>
             <div className="text-sm text-tertiary">加载中...</div>
@@ -345,7 +346,7 @@ export default function DataSources() {
                   数据库: <span>{ds.database || "-"}</span>
                 </div>
                 <div className="datasource-meta-item">
-                  表数: <span>{ds.tableCount}</span>
+                  表数: <span>{ds.tableCount >= 0 ? ds.tableCount : "-"}</span>
                 </div>
                 <div className="datasource-meta-item">
                   最后同步: <span>{formatDate(ds.lastSyncAt)}</span>

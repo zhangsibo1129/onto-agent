@@ -70,14 +70,14 @@ export default function DataSources() {
 
   useEffect(() => {
     const editId = location.state?.editId as string | undefined
-    if (editId) {
+    if (editId && !loading && datasources.length > 0) {
       const ds = datasources.find(d => d.id === editId)
       if (ds) {
         handleOpenEdit(ds)
       }
       navigate(location.pathname, { replace: true })
     }
-  }, [location.state, datasources])
+  }, [location.state, datasources, loading])
 
   const loadDatasources = async () => {
     try {

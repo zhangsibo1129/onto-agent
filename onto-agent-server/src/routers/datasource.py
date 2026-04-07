@@ -176,27 +176,32 @@ async def scan_datasource(
     if not datasource:
         raise HTTPException(status_code=404, detail="Datasource not found")
 
-    tables = await datasource_service.get_postgres_tables(
-        host=datasource.host or "localhost",
-        port=datasource.port or 5432,
-        database=datasource.database or "",
-        user=datasource.username or "",
-        password=datasource.password or "",
-        schema=datasource.schema or "public",
-    )
+    try:
+        tables = await datasource_service.get_postgres_tables(
+            host=datasource.host or "localhost",
+            port=datasource.port or 5432,
+            database=datasource.database or "",
+            user=datasource.username or "",
+            password=datasource.password or "",
+            schema=datasource.schema or "public",
+        )
 
-    datasource.last_sync_at = datetime.utcnow()
-    datasource.table_count = len(tables)
-    await db.commit()
+        datasource.last_sync_at = datetime.utcnow()
+        datasource.table_count = len(tables)
+        await db.commit()
 
-    now = datetime.now(timezone.utc)
-    return success_response(
-        {
-            "status": "completed",
-            "tables": [t.model_dump() for t in tables],
-            "scannedAt": now.isoformat(),
-        }
-    )
+        now = datetime.now(timezone.utc)
+        return success_response(
+            {
+                "status": "completed",
+                "tables": [t.model_dump() for t in tables],
+                "scannedAt": now.isoformat(),
+            }
+        )
+    except Exception as e:
+        datasource.status = "error"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
 
 
 @router.get("/{datasource_id}/tables")
@@ -206,25 +211,28 @@ async def get_tables(datasource_id: str, db: AsyncSession = Depends(get_db)) -> 
     if not datasource:
         raise HTTPException(status_code=404, detail="Datasource not found")
 
-    tables = await datasource_service.get_postgres_tables(
-        host=datasource.host or "localhost",
-        port=datasource.port or 5432,
-        database=datasource.database or "",
-        user=datasource.username or "",
-        password=datasource.password or "",
-        schema=datasource.schema or "public",
-    )
+    try:
+        tables = await datasource_service.get_postgres_tables(
+            host=datasource.host or "localhost",
+            port=datasource.port or 5432,
+            database=datasource.database or "",
+            user=datasource.username or "",
+            password=datasource.password or "",
+            schema=datasource.schema or "public",
+        )
 
-    datasource.last_sync_at = datetime.utcnow()
-    datasource.table_count = len(tables)
-    await db.commit()
+        datasource.last_sync_at = datetime.utcnow()
+        datasource.table_count = len(tables)
+        await db.commit()
 
-    return success_response(
-        {
-            "tables": [t.model_dump() for t in tables],
-            "scannedAt": datetime.utcnow().isoformat(),
-        }
-    )
+        return success_response(
+            {
+                "tables": [t.model_dump() for t in tables],
+                "scannedAt": datetime.utcnow().isoformat(),
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get tables: {str(e)}")
 
 
 @router.get("/{datasource_id}/tables/{table_name}/columns")
@@ -236,19 +244,22 @@ async def get_columns(
     if not datasource:
         raise HTTPException(status_code=404, detail="Datasource not found")
 
-    columns = await datasource_service.get_postgres_columns(
-        host=datasource.host or "localhost",
-        port=datasource.port or 5432,
-        database=datasource.database or "",
-        user=datasource.username or "",
-        password=datasource.password or "",
-        table_name=table_name,
-        schema=datasource.schema or "public",
-    )
+    try:
+        columns = await datasource_service.get_postgres_columns(
+            host=datasource.host or "localhost",
+            port=datasource.port or 5432,
+            database=datasource.database or "",
+            user=datasource.username or "",
+            password=datasource.password or "",
+            table_name=table_name,
+            schema=datasource.schema or "public",
+        )
 
-    return success_response(
-        {
-            "tableName": table_name,
-            "columns": [c.model_dump() for c in columns],
-        }
-    )
+        return success_response(
+            {
+                "tableName": table_name,
+                "columns": [c.model_dump() for c in columns],
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get columns: {str(e)}")

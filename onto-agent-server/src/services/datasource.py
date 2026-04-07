@@ -89,6 +89,8 @@ async def get_postgres_tables(
             )
             for row in rows
         ]
+    except Exception as e:
+        raise Exception(f"Failed to get tables: {str(e)}")
     finally:
         if conn:
             await conn.close()
@@ -141,6 +143,8 @@ async def get_postgres_columns(
             )
             for row in rows
         ]
+    except Exception as e:
+        raise Exception(f"Failed to get columns: {str(e)}")
     finally:
         if conn:
             await conn.close()

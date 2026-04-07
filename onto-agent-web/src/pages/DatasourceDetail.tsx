@@ -123,7 +123,7 @@ export default function DatasourceDetail() {
           )}
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/datasources', { state: { editId: id } })}>编辑</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/data-sources', { state: { editId: id } })}>编辑</button>
           <button className="btn btn-primary btn-sm" onClick={handleScan} disabled={loadingTables || datasource?.status !== "connected"}>
             {loadingTables ? "同步中..." : "同步"}
           </button>

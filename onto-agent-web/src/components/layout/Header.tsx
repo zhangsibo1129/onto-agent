@@ -1,5 +1,6 @@
-import { Link } from "react-router-dom"
+import { Link, useLocation } from "react-router-dom"
 import "./Breadcrumb.css"
+import "./Header.css"
 
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
@@ -70,8 +71,8 @@ function getBreadcrumb(pathname: string) {
 }
 
 export function Header() {
-  const pathname = window.location.pathname
-  const breadcrumbs = getBreadcrumb(pathname)
+  const location = useLocation()
+  const breadcrumbs = getBreadcrumb(location.pathname)
 
   return (
     <header className="header">

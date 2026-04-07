@@ -1,15 +1,16 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import Field
+from typing import Optional
 from datetime import datetime
+from src.core.naming import CamelCaseModel
 
 
-class DatasourceBase(BaseModel):
+class DatasourceBase(CamelCaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     type: str = Field(..., min_length=1, max_length=50)
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
-    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    db_schema: Optional[str] = Field(default=None, alias="schema")
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_mode: Optional[str] = None
@@ -19,37 +20,42 @@ class DatasourceCreate(DatasourceBase):
     pass
 
 
-class DatasourceUpdate(BaseModel):
+class DatasourceUpdate(CamelCaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
-    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    db_schema: Optional[str] = Field(default=None, alias="schema")
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_mode: Optional[str] = None
 
 
-class DatasourceResponse(DatasourceBase):
+class DatasourceResponse(CamelCaseModel):
     id: str
+    name: str
+    type: str
     status: str
     table_count: int
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    db_schema: Optional[str] = Field(default=None, alias="schema")
+    username: Optional[str] = None
+    ssl_mode: Optional[str] = None
     last_sync_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class TableInfo(BaseModel):
+class TableInfo(CamelCaseModel):
     name: str
     columns: int
     row_count: int
 
 
-class ColumnInfo(BaseModel):
+class ColumnInfo(CamelCaseModel):
     name: str
     type: str
     nullable: bool
@@ -57,7 +63,7 @@ class ColumnInfo(BaseModel):
     default_value: Optional[str] = None
 
 
-class TestResult(BaseModel):
+class TestResult(CamelCaseModel):
     connected: bool
     latency: Optional[str] = None
     version: Optional[str] = None
@@ -65,18 +71,18 @@ class TestResult(BaseModel):
     error: Optional[str] = None
 
 
-class TestConnectionRequest(BaseModel):
+class TestConnectionRequest(CamelCaseModel):
     type: str = Field(..., min_length=1, max_length=50)
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
-    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    db_schema: Optional[str] = Field(default=None, alias="schema")
     username: Optional[str] = None
     password: Optional[str] = None
     ssl_mode: Optional[str] = None
 
 
-class ApiResponse(BaseModel):
+class ApiResponse(CamelCaseModel):
     success: bool = True
     data: Optional[dict] = None
     error: Optional[dict] = None

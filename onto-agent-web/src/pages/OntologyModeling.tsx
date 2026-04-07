@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { BackButton } from "../components/layout/Header"
 
 interface ObjectType {
   id: string
@@ -127,7 +128,9 @@ export default function OntologyModeling() {
   const currentObject = objectTypes.find((o) => o.id === selectedObject)
 
   return (
-    <div className="ontology-canvas">
+    <div className="page-with-back">
+      <BackButton to="/ontologies" label="返回本体列表" />
+      <div className="ontology-canvas">
       <div className="ontology-sidebar-panel">
         <div className="ontology-sidebar-header">
           <div className="flex items-center justify-between">
@@ -303,6 +306,7 @@ export default function OntologyModeling() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+  </div>
   )
 }

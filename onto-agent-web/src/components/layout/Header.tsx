@@ -1,11 +1,10 @@
-import { useLocation, Link } from "react-router-dom"
+import { Link } from "react-router-dom"
+import "./Breadcrumb.css"
 
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
   "/data-sources": "数据源管理",
-  "/data-sources/:id": "数据源详情",
   "/ontologies": "本体列表",
-  "/ontologies/:id": "本体建模",
   "/mapping": "数据映射",
   "/query": "语义查询",
   "/nl-query": "自然语言查询",
@@ -16,46 +15,77 @@ const routeNames: Record<string, string> = {
   "/api-management": "API 管理",
 }
 
-function getBreadcrumb(pathname: string): { label: string; isCurrent: boolean }[] {
+function getBreadcrumb(pathname: string) {
   if (pathname === "/") {
     return [
-      { label: "首页", isCurrent: false },
-      { label: routeNames["/"], isCurrent: true },
+      { label: "首页", href: "/" },
+      { label: routeNames["/"] },
     ]
   }
 
-  const segments = pathname.split("/").filter(Boolean)
-  const crumbs: { label: string; isCurrent: boolean }[] = [
-    { label: "首页", isCurrent: false },
+  if (pathname === "/data-sources") {
+    return [
+      { label: "首页", href: "/" },
+      { label: routeNames["/data-sources"] },
+    ]
+  }
+
+  if (pathname.startsWith("/data-sources/")) {
+    return [
+      { label: "首页", href: "/" },
+      { label: "数据源管理", href: "/data-sources" },
+      { label: "数据源详情" },
+    ]
+  }
+
+  if (pathname === "/ontologies") {
+    return [
+      { label: "首页", href: "/" },
+      { label: routeNames["/ontologies"] },
+    ]
+  }
+
+  if (pathname.startsWith("/ontologies/")) {
+    return [
+      { label: "首页", href: "/" },
+      { label: "本体列表", href: "/ontologies" },
+      { label: "本体建模" },
+    ]
+  }
+
+  const crumbs: { label: string; href?: string }[] = [
+    { label: "首页", href: "/" },
   ]
 
+  const segments = pathname.split("/").filter(Boolean)
   let currentPath = ""
+  
   for (const segment of segments) {
     currentPath += `/${segment}`
-    const label = routeNames[currentPath] || routeNames[`/${segment}`] || segment
-    crumbs.push({ label, isCurrent: currentPath === pathname })
+    const label = routeNames[currentPath] || segment
+    crumbs.push({ label })
   }
 
   return crumbs
 }
 
 export function Header() {
-  const location = useLocation()
-  const breadcrumbs = getBreadcrumb(location.pathname)
+  const pathname = window.location.pathname
+  const breadcrumbs = getBreadcrumb(pathname)
 
   return (
     <header className="header">
       <div className="header-left">
         <div className="header-breadcrumb">
           {breadcrumbs.map((crumb, index) => (
-            <>
+            <span key={index}>
               {index > 0 && <span className="separator">/</span>}
-              {index === 0 ? (
-                <Link to="/">{crumb.label}</Link>
+              {crumb.href ? (
+                <Link to={crumb.href}>{crumb.label}</Link>
               ) : (
-                <span className={crumb.isCurrent ? "current" : ""}>{crumb.label}</span>
+                <span className={index === breadcrumbs.length - 1 ? "current" : ""}>{crumb.label}</span>
               )}
-            </>
+            </span>
           ))}
         </div>
       </div>
@@ -73,5 +103,21 @@ export function Header() {
         <button className="header-icon-btn">⚙</button>
       </div>
     </header>
+  )
+}
+
+interface BackButtonProps {
+  to: string
+  label?: string
+}
+
+export function BackButton({ to, label = "返回" }: BackButtonProps) {
+  return (
+    <div className="header-back">
+      <Link to={to} className="back-btn">
+        ←
+      </Link>
+      {label && <span className="text-sm text-tertiary">{label}</span>}
+    </div>
   )
 }

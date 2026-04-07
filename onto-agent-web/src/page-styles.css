@@ -1671,3 +1671,10 @@
   height: 8px;
   border-radius: var(--radius-full);
 }
+
+/* === Page with Back Button === */
+.page-with-back {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

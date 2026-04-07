@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { BackButton } from "@/components/layout/Header"
 
 const allTables = [
   { name: "customers", cols: 15, rows: 12450, update: "1小时前", pk: "customer_id" },
@@ -81,6 +82,7 @@ export default function DatasourceDetail() {
 
   return (
     <>
+      <BackButton to="/data-sources" label="返回数据源管理" />
       <div className="datasource-header">
         <div className="datasource-icon-lg">⬡</div>
         <div className="datasource-info">

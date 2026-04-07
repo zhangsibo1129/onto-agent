@@ -70,7 +70,7 @@ const tableColumns: Record<string, { name: string; type: string; key: string }[]
 }
 
 export default function DatasourceDetail() {
-  const [selectedTable, setSelectedTable] = useState<string>("customers")
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("全部")
 
@@ -84,7 +84,7 @@ export default function DatasourceDetail() {
     return matchesSearch && matchesStatus
   })
 
-  const currentColumns = tableColumns[selectedTable] || []
+  const currentColumns = selectedTable ? (tableColumns[selectedTable] || []) : []
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -142,9 +142,6 @@ export default function DatasourceDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: "var(--space-4)" }}>
-        <div className="card-header">
-          <span className="card-title">连接信息</span>
-        </div>
         <div className="card-body">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-4)" }}>
             <div><div className="text-xs text-tertiary mb-1">主机地址</div><div className="text-sm mono">erp-db.internal</div></div>
@@ -155,83 +152,96 @@ export default function DatasourceDetail() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">数据库表 ({filteredTables.length})</span>
-          <div style={{ display: "flex", gap: "var(--space-3)" }}>
-            <div className="search-input">
-              <span className="icon">⌕</span>
-              <input
-                type="text"
-                placeholder="搜索表名..."
-                style={{ width: 160 }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+      <div className="detail-layout">
+        <div className="detail-left">
+          <div className="card-header" style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--border-primary)" }}>
+            <span className="card-title">数据库表 ({filteredTables.length})</span>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <div className="search-input" style={{ width: 140 }}>
+                <span className="icon">⌕</span>
+                <input
+                  type="text"
+                  placeholder="搜索..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <select
+                className="form-select"
+                style={{ width: 100 }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option>全部</option>
+                <option>已映射</option>
+                <option>部分映射</option>
+                <option>未映射</option>
+              </select>
             </div>
-            <select
-              className="form-select"
-              style={{ width: 120 }}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option>全部</option>
-              <option>已映射</option>
-              <option>部分映射</option>
-              <option>未映射</option>
-            </select>
           </div>
-        </div>
-        <div className="card-body" style={{ padding: "var(--space-3)" }}>
-          <div className="table-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+          <div className="table-list">
             {filteredTables.map((t) => {
               const badge = getStatusBadge(t.status)
               const isSelected = selectedTable === t.name
               return (
                 <div
                   key={t.name}
-                  className={`table-card ${isSelected ? "selected" : ""}`}
-                  onClick={() => setSelectedTable(t.name)}
+                  className={`table-list-item ${isSelected ? "selected" : ""}`}
+                  onClick={() => setSelectedTable(isSelected ? null : t.name)}
                 >
-                  <div className="table-card-header">
-                    <span className="table-card-name">{t.name}</span>
+                  <div className="table-list-item-main">
+                    <span className="table-list-name">{t.name}</span>
                     <span className={`badge ${badge.class}`}>{badge.text}</span>
                   </div>
-                  <div className="table-card-meta" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                    <div>列: <span>{t.cols}</span></div>
-                    <div>行: <span>{t.rows >= 1000 ? `${(t.rows / 1000).toFixed(1)}k` : t.rows}</span></div>
+                  <div className="table-list-meta">
+                    <span>{t.cols} 列</span>
+                    <span>·</span>
+                    <span>{t.rows >= 1000 ? `${(t.rows / 1000).toFixed(1)}k` : t.rows} 行</span>
+                    {t.pk && <span>·</span>}
+                    {t.pk && <span className="pk-badge">PK: {t.pk}</span>}
                   </div>
-                  {t.pk && (
-                    <div className="table-card-tags">
-                      <span className="badge badge-draft">PK: {t.pk}</span>
-                    </div>
-                  )}
                 </div>
               )
             })}
           </div>
+        </div>
 
-          {selectedTable && currentColumns.length > 0 && (
-            <div className="table-detail" style={{ marginTop: "var(--space-4)" }}>
-              <div className="table-detail-header">
-                <span className="table-detail-title">{selectedTable}</span>
-                <span className="text-xs text-tertiary">{currentColumns.length} 列</span>
-              </div>
-              <div className="column-list-compact">
-                {currentColumns.map((col) => (
-                  <div key={col.name} className="column-item-compact">
-                    <span className="ci-name">{col.name}</span>
-                    <span className="ci-type">{col.type}</span>
-                    {col.key && (
-                      <span className={`badge badge-${col.key === "PK" ? "primary" : col.key === "FK" ? "secondary" : "draft"}`}>
-                        {col.key}
-                      </span>
-                    )}
+        <div className="detail-right">
+          <div className="card" style={{ height: "100%" }}>
+            {selectedTable ? (
+              <>
+                <div className="card-header">
+                  <span className="card-title">{selectedTable} 表结构</span>
+                  <span className="text-xs text-tertiary">{currentColumns.length} 列</span>
+                </div>
+                <div className="column-table">
+                  <div className="column-table-header">
+                    <span style={{ flex: 2 }}>列名</span>
+                    <span style={{ flex: 1 }}>类型</span>
+                    <span style={{ flex: 0, width: 60 }}>键</span>
                   </div>
-                ))}
+                  {currentColumns.map((col) => (
+                    <div key={col.name} className="column-table-row">
+                      <span style={{ flex: 2 }} className="col-name">{col.name}</span>
+                      <span style={{ flex: 1 }} className="col-type">{col.type}</span>
+                      <span style={{ flex: 0, width: 60 }}>
+                        {col.key && (
+                          <span className={`badge ${col.key === "PK" ? "badge-primary" : col.key === "FK" ? "badge-secondary" : "badge-draft"}`}>
+                            {col.key}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <span className="empty-icon">◈</span>
+                <span>点击左侧表名查看表结构</span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </>

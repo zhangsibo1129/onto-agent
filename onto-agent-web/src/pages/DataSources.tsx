@@ -298,10 +298,7 @@ export default function DataSources() {
         <button
           type="button"
           className="datasource-card add-card"
-          onClick={() => {
-            console.log("Add card clicked!")
-            setShowModal(true)
-          }}
+          onClick={() => setShowModal(true)}
         >
           <div className="add-icon">+</div>
           <div className="add-text">添加数据源</div>
@@ -357,171 +354,169 @@ export default function DataSources() {
         )}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
-          <div className="modal">
-            <div className="modal-header">
-              <h3 className="modal-title">添加数据源</h3>
-              <button className="modal-close" onClick={handleCloseModal}>✕</button>
+      <div className={`modal-overlay ${showModal ? "active" : ""}`} onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
+        <div className="modal">
+          <div className="modal-header">
+            <h3 className="modal-title">添加数据源</h3>
+            <button className="modal-close" onClick={handleCloseModal}>✕</button>
+          </div>
+          <div className="modal-body">
+            <div className="form-group">
+              <label className="form-label">数据源名称 <span className="required">*</span></label>
+              <input
+                type="text"
+                className={`form-input ${errors.name ? "error" : ""}`}
+                placeholder="例如：ERP-Production"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+              />
+              {errors.name && <div className="form-error">{errors.name}</div>}
+              <div className="form-hint">用于标识此数据源的名称，建议使用环境+系统名</div>
             </div>
-            <div className="modal-body">
+            <div className="form-group">
+              <label className="form-label">数据库类型 <span className="required">*</span></label>
+              <select
+                className={`form-select ${errors.type ? "error" : ""}`}
+                value={formData.type}
+                onChange={(e) => handleInputChange("type", e.target.value)}
+              >
+                <option value="postgresql">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+                <option value="sqlserver">SQL Server</option>
+                <option value="oracle">Oracle</option>
+              </select>
+              {errors.type && <div className="form-error">{errors.type}</div>}
+            </div>
+            <div className="form-row">
               <div className="form-group">
-                <label className="form-label">数据源名称 <span className="required">*</span></label>
+                <label className="form-label">主机地址 <span className="required">*</span></label>
                 <input
                   type="text"
-                  className={`form-input ${errors.name ? "error" : ""}`}
-                  placeholder="例如：ERP-Production"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className={`form-input ${errors.host ? "error" : ""}`}
+                  placeholder="db.example.com"
+                  value={formData.host}
+                  onChange={(e) => handleInputChange("host", e.target.value)}
                 />
-                {errors.name && <div className="form-error">{errors.name}</div>}
-                <div className="form-hint">用于标识此数据源的名称，建议使用环境+系统名</div>
+                {errors.host && <div className="form-error">{errors.host}</div>}
               </div>
               <div className="form-group">
-                <label className="form-label">数据库类型 <span className="required">*</span></label>
-                <select
-                  className={`form-select ${errors.type ? "error" : ""}`}
-                  value={formData.type}
-                  onChange={(e) => handleInputChange("type", e.target.value)}
-                >
-                  <option value="postgresql">PostgreSQL</option>
-                  <option value="mysql">MySQL</option>
-                  <option value="sqlserver">SQL Server</option>
-                  <option value="oracle">Oracle</option>
-                </select>
-                {errors.type && <div className="form-error">{errors.type}</div>}
+                <label className="form-label">端口 <span className="required">*</span></label>
+                <input
+                  type="number"
+                  className={`form-input ${errors.port ? "error" : ""}`}
+                  value={formData.port}
+                  onChange={(e) => handleInputChange("port", e.target.value)}
+                />
+                {errors.port && <div className="form-error">{errors.port}</div>}
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">主机地址 <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    className={`form-input ${errors.host ? "error" : ""}`}
-                    placeholder="db.example.com"
-                    value={formData.host}
-                    onChange={(e) => handleInputChange("host", e.target.value)}
-                  />
-                  {errors.host && <div className="form-error">{errors.host}</div>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">端口 <span className="required">*</span></label>
-                  <input
-                    type="number"
-                    className={`form-input ${errors.port ? "error" : ""}`}
-                    value={formData.port}
-                    onChange={(e) => handleInputChange("port", e.target.value)}
-                  />
-                  {errors.port && <div className="form-error">{errors.port}</div>}
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">数据库名 <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    className={`form-input ${errors.database ? "error" : ""}`}
-                    placeholder="database_name"
-                    value={formData.database}
-                    onChange={(e) => handleInputChange("database", e.target.value)}
-                  />
-                  {errors.database && <div className="form-error">{errors.database}</div>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Schema</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={formData.schema}
-                    onChange={(e) => handleInputChange("schema", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">用户名 <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    className={`form-input ${errors.username ? "error" : ""}`}
-                    placeholder="postgres"
-                    value={formData.username}
-                    onChange={(e) => handleInputChange("username", e.target.value)}
-                  />
-                  {errors.username && <div className="form-error">{errors.username}</div>}
-                </div>
-                <div className="form-group">
-                  <label className="form-label">密码 <span className="required">*</span></label>
-                  <input
-                    type="password"
-                    className={`form-input ${errors.password ? "error" : ""}`}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange("password", e.target.value)}
-                  />
-                  {errors.password && <div className="form-error">{errors.password}</div>}
-                </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">数据库名 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  className={`form-input ${errors.database ? "error" : ""}`}
+                  placeholder="database_name"
+                  value={formData.database}
+                  onChange={(e) => handleInputChange("database", e.target.value)}
+                />
+                {errors.database && <div className="form-error">{errors.database}</div>}
               </div>
               <div className="form-group">
-                <label className="form-label">描述</label>
-                <textarea
-                  className="form-textarea"
-                  placeholder="数据源用途说明..."
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
+                <label className="form-label">Schema</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.schema}
+                  onChange={(e) => handleInputChange("schema", e.target.value)}
                 />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
-                <label className="form-label">SSL 模式</label>
-                <select
-                  className="form-select"
-                  value={formData.sslMode}
-                  onChange={(e) => handleInputChange("sslMode", e.target.value)}
-                >
-                  <option value="prefer">prefer</option>
-                  <option value="require">require</option>
-                  <option value="disable">disable</option>
-                  <option value="verify-ca">verify-ca</option>
-                  <option value="verify-full">verify-full</option>
-                </select>
+                <label className="form-label">用户名 <span className="required">*</span></label>
+                <input
+                  type="text"
+                  className={`form-input ${errors.username ? "error" : ""}`}
+                  placeholder="postgres"
+                  value={formData.username}
+                  onChange={(e) => handleInputChange("username", e.target.value)}
+                />
+                {errors.username && <div className="form-error">{errors.username}</div>}
               </div>
-
-              {connectionStatus !== "idle" && (
-                <div className={`connection-result ${connectionStatus}`}>
-                  {connectionStatus === "testing" && (
-                    <span className="connection-spinner">⟳</span>
-                  )}
-                  {connectionStatus === "success" && <span className="connection-icon">✓</span>}
-                  {connectionStatus === "error" && <span className="connection-icon">!</span>}
-                  <span>{connectionMessage}</span>
-                </div>
-              )}
-
-              {saveStatus === "error" && (
-                <div className="save-result error">
-                  <span className="connection-icon">!</span>
-                  <span>{saveMessage}</span>
-                </div>
-              )}
+              <div className="form-group">
+                <label className="form-label">密码 <span className="required">*</span></label>
+                <input
+                  type="password"
+                  className={`form-input ${errors.password ? "error" : ""}`}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange("password", e.target.value)}
+                />
+                {errors.password && <div className="form-error">{errors.password}</div>}
+              </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={handleCloseModal}>取消</button>
-              <button
-                className="btn btn-ghost"
-                onClick={handleTestConnection}
-                disabled={connectionStatus === "testing" || saveStatus === "saving"}
-              >
-                {connectionStatus === "testing" ? "测试中..." : "测试连接"}
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSave}
-                disabled={connectionStatus === "testing" || saveStatus === "saving"}
-              >
-                {saveStatus === "saving" ? "保存中..." : "保存并扫描"}
-              </button>
+            <div className="form-group">
+              <label className="form-label">描述</label>
+              <textarea
+                className="form-textarea"
+                placeholder="数据源用途说明..."
+                value={formData.description}
+                onChange={(e) => handleInputChange("description", e.target.value)}
+              />
             </div>
+            <div className="form-group">
+              <label className="form-label">SSL 模式</label>
+              <select
+                className="form-select"
+                value={formData.sslMode}
+                onChange={(e) => handleInputChange("sslMode", e.target.value)}
+              >
+                <option value="prefer">prefer</option>
+                <option value="require">require</option>
+                <option value="disable">disable</option>
+                <option value="verify-ca">verify-ca</option>
+                <option value="verify-full">verify-full</option>
+              </select>
+            </div>
+
+            {connectionStatus !== "idle" && (
+              <div className={`connection-result ${connectionStatus}`}>
+                {connectionStatus === "testing" && (
+                  <span className="connection-spinner">⟳</span>
+                )}
+                {connectionStatus === "success" && <span className="connection-icon">✓</span>}
+                {connectionStatus === "error" && <span className="connection-icon">!</span>}
+                <span>{connectionMessage}</span>
+              </div>
+            )}
+
+            {saveStatus === "error" && (
+              <div className="save-result error">
+                <span className="connection-icon">!</span>
+                <span>{saveMessage}</span>
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={handleCloseModal}>取消</button>
+            <button
+              className="btn btn-ghost"
+              onClick={handleTestConnection}
+              disabled={connectionStatus === "testing" || saveStatus === "saving"}
+            >
+              {connectionStatus === "testing" ? "测试中..." : "测试连接"}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={connectionStatus === "testing" || saveStatus === "saving"}
+            >
+              {saveStatus === "saving" ? "保存中..." : "保存并扫描"}
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </>
   )
 }

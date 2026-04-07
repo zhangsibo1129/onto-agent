@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import ForceGraph2D from "react-force-graph-2d"
+import * as d3 from "d3"
 import { mockOntologies } from "@/data/mock"
 import "./OntologyModeling.css"
 
@@ -28,24 +28,29 @@ interface OntologyRelation {
   propertyId: string
 }
 
-interface GraphNode {
+interface GraphNode extends d3.SimulationNodeDatum {
   id: string
   name: string
   displayName: string
-  val: number
 }
 
-interface GraphLink {
-  source: string
-  target: string
+interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   property: string
   displayName: string
+  type: "data" | "object"
 }
 
 export default function OntologyModeling() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const graphRef = useRef<any>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null)
+  const nodesRef = useRef<GraphNode[]>([])
+  const linksRef = useRef<GraphLink[]>([])
+
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [, setRenderTick] = useState(0)
 
   const ontology = mockOntologies.find((o) => o.id === id)
 
@@ -71,6 +76,7 @@ export default function OntologyModeling() {
   ])
 
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [hoveredClassId, setHoveredClassId] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "property" | "relation" | null>(null)
 
   if (!ontology) {
@@ -86,23 +92,70 @@ export default function OntologyModeling() {
   const incomingRelations = relations.filter((r) => r.targetId === selectedClassId)
   const outgoingRelations = relations.filter((r) => r.sourceId === selectedClassId)
 
-  const handleNodeClick = useCallback((node: any) => {
-    setSelectedClassId(node.id)
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        setDimensions({ width: rect.width, height: rect.height })
+      }
+    }
+    updateDimensions()
+    window.addEventListener("resize", updateDimensions)
+    return () => window.removeEventListener("resize", updateDimensions)
   }, [])
 
-  const graphData: { nodes: GraphNode[]; links: GraphLink[] } = {
-    nodes: classes.map((c) => ({
+  useEffect(() => {
+    const nodes: GraphNode[] = classes.map((c) => ({
       id: c.id,
       name: c.name,
       displayName: c.displayName,
-      val: 1.5,
-    })),
-    links: relations.map((rel) => ({
+    }))
+
+    const links: GraphLink[] = relations.map((rel) => ({
       source: rel.sourceId,
       target: rel.targetId,
       property: rel.propertyId,
       displayName: getPropertyById(rel.propertyId)?.displayName || "",
-    })),
+      type: getPropertyById(rel.propertyId)?.type || "object",
+    }))
+
+    nodesRef.current = nodes
+    linksRef.current = links
+
+    if (simulationRef.current) {
+      simulationRef.current.stop()
+    }
+
+    const simulation = d3.forceSimulation<GraphNode>(nodes)
+      .force("link", d3.forceLink<GraphNode, GraphLink>(links).id((d) => d.id).distance(180).strength(0.5))
+      .force("charge", d3.forceManyBody().strength(-600))
+      .force("center", d3.forceCenter(dimensions.width / 2, dimensions.height / 2))
+      .force("collision", d3.forceCollide().radius(80))
+      .alphaDecay(0.02)
+
+    simulation.on("tick", () => {
+      setRenderTick((t) => t + 1)
+    })
+
+    simulationRef.current = simulation
+
+    return () => {
+      simulation.stop()
+    }
+  }, [dimensions, classes.length, relations.length])
+
+  const getNodeColor = (nodeId: string) => {
+    if (nodeId === selectedClassId) return "#818CF8"
+    if (nodeId === hoveredClassId) return "#A78BFA"
+    return "#ACF"
+  }
+
+  const handleNodeClick = (nodeId: string) => {
+    setSelectedClassId(nodeId)
+  }
+
+  const handleNodeHover = (nodeId: string | null) => {
+    setHoveredClassId(nodeId)
   }
 
   const handleAddClass = (name: string, displayName: string) => {
@@ -157,138 +210,308 @@ export default function OntologyModeling() {
     setShowAddModal(null)
   }
 
+  const nodes = nodesRef.current
+  const links = linksRef.current
+
   return (
     <div className="ontology-canvas">
       <div className="ontology-toolbar">
-        <nav className="breadcrumb">
-          <span className="breadcrumb-item" onClick={() => navigate("/ontologies")}>本体</span>
-          <span className="breadcrumb-sep">/</span>
-          <span className="breadcrumb-item active">{ontology.name}</span>
-        </nav>
+        <div className="toolbar-left">
+          <nav className="breadcrumb">
+            <span className="breadcrumb-item" onClick={() => navigate("/ontologies")}>本体</span>
+            <span className="breadcrumb-sep">/</span>
+            <span className="breadcrumb-item active">{ontology.name}</span>
+          </nav>
+          <div className="ontology-stats">
+            <span className="stat-item">
+              <span className="stat-dot class"></span>
+              类: {classes.length}
+            </span>
+            <span className="stat-item">
+              <span className="stat-dot property"></span>
+              属性: {properties.length}
+            </span>
+            <span className="stat-item">
+              <span className="stat-dot relation"></span>
+              关系: {relations.length}
+            </span>
+          </div>
+        </div>
         <div className="toolbar-actions">
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("class")}>+ 添加类</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("class")}>+ 类</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("property")}>+ 属性</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("relation")}>+ 关系</button>
+          <div className="toolbar-divider"></div>
           <button className="btn btn-secondary btn-sm">导入</button>
           <button className="btn btn-secondary btn-sm">导出</button>
           <button className="btn btn-primary btn-sm">保存</button>
         </div>
       </div>
 
-      <div className="graph-wrapper">
-        <ForceGraph2D
-          ref={graphRef}
-          graphData={graphData}
-          nodeLabel="displayName"
-          nodeColor={(node: any) => node.id === selectedClassId ? "#818CF8" : "#4F46E5"}
-          nodeRelSize={8}
-          linkColor={() => "#475569"}
-          linkWidth={2}
-          linkLabel="displayName"
-          linkDirectionalArrowLength={6}
-          linkDirectionalArrowRelPos={0.9}
-          onNodeClick={handleNodeClick}
-          backgroundColor="#0F172A"
-          d3AlphaDecay={0.02}
-          d3VelocityDecay={0.3}
-          warmupTicks={100}
-          cooldownTicks={200}
-          nodeCanvasObject={(node: any, ctx: any, globalScale: number) => {
-            const label = (node as any).displayName
-            const fontSize = 12 / globalScale
-            ctx.font = `${fontSize}px Inter, sans-serif`
-            ctx.textAlign = "center"
-            ctx.textBaseline = "middle"
-            ctx.fillStyle = node.id === selectedClassId ? "#818CF8" : "#E2E8F0"
-            ctx.fillText(label, (node as any).x, (node as any).y + 16 / globalScale)
-          }}
-        />
+      <div className="graph-wrapper" ref={containerRef}>
+        <svg ref={svgRef} className="ontology-svg" width={dimensions.width} height={dimensions.height}>
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#64748B" />
+            </marker>
+            <marker
+              id="arrowhead-selected"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#818CF8" />
+            </marker>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+            </filter>
+          </defs>
 
-        {selectedClass && (
-          <div className="entity-panel">
-            <div className="panel-header">
-              <div className="panel-title">
-                <span className="panel-icon">◉</span>
-                <span className="panel-name">{selectedClass.displayName}</span>
-              </div>
-              <button className="panel-close" onClick={() => setSelectedClassId(null)}>✕</button>
-            </div>
+          <g className="links">
+            {links.map((link, i) => {
+              const sourceNode = link.source as GraphNode
+              const targetNode = link.target as GraphNode
+              const sourceId = typeof sourceNode === "string" ? sourceNode : sourceNode.id
+              const targetId = typeof targetNode === "string" ? targetNode : targetNode.id
+              const isHighlighted = sourceId === selectedClassId || targetId === selectedClassId
 
-            <div className="panel-body">
-              <div className="panel-section">
-                <div className="section-label">基本信息</div>
-                <div className="info-row">
-                  <span className="info-key">英文名</span>
-                  <span className="info-value">{selectedClass.name}</span>
-                </div>
-              </div>
+              const sx = sourceNode.x || 0
+              const sy = sourceNode.y || 0
+              const tx = targetNode.x || 0
+              const ty = targetNode.y || 0
+              const dx = tx - sx
+              const dy = ty - sy
+              const dr = Math.sqrt(dx * dx + dy * dy) * 1.2
+              const pathD = `M${sx},${sy}A${dr},${dr} 0 0,1 ${tx},${ty}`
 
-              {selectedClassDataProperties.length > 0 && (
-                <div className="panel-section">
-                  <div className="section-label">数据属性</div>
-                  {selectedClassDataProperties.map((prop) => (
-                    <div key={prop.id} className="property-row">
-                      <span className="prop-badge data">String</span>
-                      <span className="prop-name">{prop.displayName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              const midX = (sx + tx) / 2
+              const midY = (sy + ty) / 2
 
-              {selectedClassObjectProperties.length > 0 && (
-                <div className="panel-section">
-                  <div className="section-label">对象属性</div>
-                  {selectedClassObjectProperties.map((prop) => (
-                    <div key={prop.id} className="property-row">
-                      <span className="prop-badge object">→</span>
-                      <span className="prop-name">{prop.displayName}</span>
-                      <span className="prop-range">{getClassById(prop.rangeClassId || "")?.displayName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              return (
+                <g key={`link-${i}`} className={`link-group ${link.type}`}>
+                  <path
+                    d={pathD}
+                    className={`link-path ${link.type === "data" ? "dashed" : ""} ${isHighlighted ? "highlighted" : ""}`}
+                    markerEnd={link.type === "object" ? `url(#${isHighlighted ? "arrowhead-selected" : "arrowhead"})` : undefined}
+                  />
+                  <g className="link-label" transform={`translate(${midX}, ${midY})`}>
+                    <rect
+                      x="-30"
+                      y="-10"
+                      width="60"
+                      height="20"
+                      rx="4"
+                      className={`link-label-bg ${isHighlighted ? "highlighted" : ""}`}
+                    />
+                    <text className={`link-label-text ${isHighlighted ? "highlighted" : ""}`}>
+                      {link.displayName}
+                    </text>
+                  </g>
+                </g>
+              )
+            })}
+          </g>
 
-              {incomingRelations.length > 0 && (
-                <div className="panel-section">
-                  <div className="section-label">入向关系</div>
-                  {incomingRelations.map((rel) => (
-                    <div key={rel.id} className="relation-row">
-                      <span className="rel-arrow">←</span>
-                      <span className="rel-name">{getPropertyById(rel.propertyId)?.displayName}</span>
-                      <span className="rel-from">{getClassById(rel.sourceId)?.displayName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <g className="nodes">
+            {nodes.map((node) => {
+              const cx = node.x || 0
+              const cy = node.y || 0
+              const isSelected = node.id === selectedClassId
+              const isHovered = node.id === hoveredClassId
 
-              {outgoingRelations.length > 0 && (
-                <div className="panel-section">
-                  <div className="section-label">出向关系</div>
-                  {outgoingRelations.map((rel) => (
-                    <div key={rel.id} className="relation-row">
-                      <span className="rel-arrow">→</span>
-                      <span className="rel-name">{getPropertyById(rel.propertyId)?.displayName}</span>
-                      <span className="rel-to">{getClassById(rel.targetId)?.displayName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              return (
+                <g
+                  key={node.id}
+                  className={`node-group ${isSelected ? "selected" : ""} ${isHovered ? "hovered" : ""}`}
+                  transform={`translate(${cx}, ${cy})`}
+                  onClick={() => handleNodeClick(node.id)}
+                  onMouseEnter={() => handleNodeHover(node.id)}
+                  onMouseLeave={() => handleNodeHover(null)}
+                >
+                  {(isSelected || isHovered) && (
+                    <circle
+                      r="58"
+                      className="node-halo"
+                      fill="none"
+                      stroke={isSelected ? "#818CF8" : "#A78BFA"}
+                      strokeWidth="2"
+                      strokeDasharray="4 2"
+                    />
+                  )}
+                  <circle
+                    r="50"
+                    className="node-circle"
+                    fill={getNodeColor(node.id)}
+                    stroke={isSelected ? "#818CF8" : "#1E293B"}
+                    strokeWidth={isSelected ? 3 : 2}
+                    filter="url(#shadow)"
+                  />
+                  <text
+                    className="node-label"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fill="#1E293B"
+                    fontSize="13"
+                    fontWeight="500"
+                  >
+                    {node.displayName.length > 10
+                      ? node.displayName.substring(0, 8) + "..."
+                      : node.displayName}
+                  </text>
+                  <title>{node.displayName}</title>
+                </g>
+              )
+            })}
+          </g>
+        </svg>
 
-              <div className="panel-actions">
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("property")}>+ 数据属性</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("relation")}>+ 对象属性</button>
-              </div>
-            </div>
+        <div className="graph-legend-vowl">
+          <div className="legend-title">图例</div>
+          <div className="legend-item">
+            <span className="legend-circle class"></span>
+            <span>类 (OWL Class)</span>
           </div>
-        )}
-
-        <div className="graph-hint">
-          <span>点击节点查看详情 · 类: {classes.length} · 关系: {relations.length}</span>
+          <div className="legend-item">
+            <span className="legend-line solid"></span>
+            <span>对象属性</span>
+          </div>
+          <div className="legend-item">
+            <span className="legend-line dashed"></span>
+            <span>数据属性</span>
+          </div>
         </div>
 
-        <div className="ontology-badge">
-          <span className="badge-name">{ontology.name}</span>
-          <span className={`badge-status ${ontology.status}`}>
-            {ontology.status === "published" ? "●" : "○"}{ontology.status === "published" ? "已发布" : "草稿"}
-          </span>
+        <div className={`entity-panel ${selectedClass ? "active" : ""}`}>
+          {selectedClass && (
+            <>
+              <div className="panel-header">
+                <div className="panel-title">
+                  <svg className="panel-icon" viewBox="0 0 24 24" width="20" height="20">
+                    <circle cx="12" cy="12" r="10" fill="#ACF" stroke="#1E293B" strokeWidth="2"/>
+                  </svg>
+                  <span className="panel-name">{selectedClass.displayName}</span>
+                </div>
+                <button className="panel-close" onClick={() => setSelectedClassId(null)}>
+                  <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div className="panel-body">
+                <div className="panel-section">
+                  <div className="section-header">
+                    <span className="section-icon">ℹ</span>
+                    <span className="section-title">基本信息</span>
+                  </div>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <span className="info-label">英文名</span>
+                      <span className="info-value mono">{selectedClass.name}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">类型</span>
+                      <span className="info-value">
+                        <span className="type-badge class">owl:Class</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedClassDataProperties.length > 0 && (
+                  <div className="panel-section">
+                    <div className="section-header">
+                      <span className="section-icon">─</span>
+                      <span className="section-title">数据属性</span>
+                      <span className="section-count">{selectedClassDataProperties.length}</span>
+                    </div>
+                    <div className="property-list">
+                      {selectedClassDataProperties.map((prop) => (
+                        <div key={prop.id} className="property-item data">
+                          <span className="prop-name">{prop.displayName}</span>
+                          <span className="prop-type">{prop.rangeType}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedClassObjectProperties.length > 0 && (
+                  <div className="panel-section">
+                    <div className="section-header">
+                      <span className="section-icon">●</span>
+                      <span className="section-title">对象属性</span>
+                      <span className="section-count">{selectedClassObjectProperties.length}</span>
+                    </div>
+                    <div className="property-list">
+                      {selectedClassObjectProperties.map((prop) => (
+                        <div key={prop.id} className="property-item object">
+                          <span className="prop-name">{prop.displayName}</span>
+                          <span className="prop-range">→ {getClassById(prop.rangeClassId || "")?.displayName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {incomingRelations.length > 0 && (
+                  <div className="panel-section">
+                    <div className="section-header">
+                      <span className="section-icon">←</span>
+                      <span className="section-title">入向关系</span>
+                      <span className="section-count">{incomingRelations.length}</span>
+                    </div>
+                    <div className="relation-list">
+                      {incomingRelations.map((rel) => (
+                        <div key={rel.id} className="relation-item">
+                          <span className="rel-arrow">←</span>
+                          <span className="rel-name">{getPropertyById(rel.propertyId)?.displayName}</span>
+                          <span className="rel-from">← {getClassById(rel.sourceId)?.displayName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {outgoingRelations.length > 0 && (
+                  <div className="panel-section">
+                    <div className="section-header">
+                      <span className="section-icon">→</span>
+                      <span className="section-title">出向关系</span>
+                      <span className="section-count">{outgoingRelations.length}</span>
+                    </div>
+                    <div className="relation-list">
+                      {outgoingRelations.map((rel) => (
+                        <div key={rel.id} className="relation-item">
+                          <span className="rel-arrow">→</span>
+                          <span className="rel-name">{getPropertyById(rel.propertyId)?.displayName}</span>
+                          <span className="rel-to">→ {getClassById(rel.targetId)?.displayName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="panel-footer-actions">
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("property")}>
+                    + 数据属性
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("relation")}>
+                    + 对象属性
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

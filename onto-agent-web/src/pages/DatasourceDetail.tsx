@@ -1,27 +1,104 @@
+import { useState } from "react"
 
-
-const tables = [
+const allTables = [
   { name: "customers", status: "success", cols: 15, rows: 12450, mapped: "客户360", update: "1小时前", pk: "customer_id" },
   { name: "orders", status: "success", cols: 18, rows: 156789, mapped: "订单全景", update: "30分钟前", pk: "order_id" },
   { name: "products", status: "success", cols: 12, rows: 3456, mapped: "订单全景", update: "2小时前", pk: "product_id" },
   { name: "invoices", status: "success", cols: 20, rows: 89234, mapped: "客户360", update: "1小时前", pk: "invoice_id" },
   { name: "addresses", status: "info", cols: 10, rows: 23567, mapped: "6/10 列", update: "3小时前", pk: "address_id" },
   { name: "contacts", status: "warning", cols: 14, rows: 34567, mapped: "-", update: "1天前", pk: "" },
+  { name: "accounts", status: "success", cols: 8, rows: 5678, mapped: "客户360", update: "2小时前", pk: "account_id" },
+  { name: "shipments", status: "info", cols: 16, rows: 12345, mapped: "4/16 列", update: "30分钟前", pk: "shipment_id" },
 ]
 
-const columns = [
-  { name: "customer_id", type: "uuid", key: "PK" },
-  { name: "customer_name", type: "varchar(255)", key: "NN" },
-  { name: "email_address", type: "varchar(255)", key: "UQ" },
-  { name: "phone_number", type: "varchar(50)", key: "" },
-  { name: "customer_tier", type: "varchar(20)", key: "" },
-  { name: "lifetime_value", type: "numeric(15,2)", key: "" },
-  { name: "created_at", type: "timestamp", key: "" },
-  { name: "updated_at", type: "timestamp", key: "" },
-  { name: "status", type: "varchar(20)", key: "" },
-]
+const tableColumns: Record<string, { name: string; type: string; key: string }[]> = {
+  customers: [
+    { name: "customer_id", type: "uuid", key: "PK" },
+    { name: "customer_name", type: "varchar(255)", key: "NN" },
+    { name: "email_address", type: "varchar(255)", key: "UQ" },
+    { name: "phone_number", type: "varchar(50)", key: "" },
+    { name: "customer_tier", type: "varchar(20)", key: "" },
+    { name: "lifetime_value", type: "numeric(15,2)", key: "" },
+    { name: "created_at", type: "timestamp", key: "" },
+    { name: "updated_at", type: "timestamp", key: "" },
+    { name: "status", type: "varchar(20)", key: "" },
+  ],
+  orders: [
+    { name: "order_id", type: "uuid", key: "PK" },
+    { name: "customer_id", type: "uuid", key: "FK" },
+    { name: "order_date", type: "timestamp", key: "NN" },
+    { name: "total_amount", type: "numeric(15,2)", key: "" },
+    { name: "status", type: "varchar(20)", key: "" },
+    { name: "shipping_address", type: "uuid", key: "FK" },
+  ],
+  products: [
+    { name: "product_id", type: "uuid", key: "PK" },
+    { name: "product_name", type: "varchar(255)", key: "NN" },
+    { name: "price", type: "numeric(10,2)", key: "" },
+    { name: "category", type: "varchar(100)", key: "" },
+  ],
+  invoices: [
+    { name: "invoice_id", type: "uuid", key: "PK" },
+    { name: "order_id", type: "uuid", key: "FK" },
+    { name: "invoice_date", type: "date", key: "NN" },
+    { name: "amount", type: "numeric(15,2)", key: "" },
+  ],
+  addresses: [
+    { name: "address_id", type: "uuid", key: "PK" },
+    { name: "customer_id", type: "uuid", key: "FK" },
+    { name: "street", type: "varchar(255)", key: "NN" },
+    { name: "city", type: "varchar(100)", key: "" },
+    { name: "country", type: "varchar(100)", key: "" },
+  ],
+  contacts: [
+    { name: "contact_id", type: "uuid", key: "PK" },
+    { name: "customer_id", type: "uuid", key: "FK" },
+    { name: "phone", type: "varchar(50)", key: "" },
+    { name: "email", type: "varchar(255)", key: "" },
+  ],
+  accounts: [
+    { name: "account_id", type: "uuid", key: "PK" },
+    { name: "account_number", type: "varchar(50)", key: "UQ" },
+    { name: "balance", type: "numeric(15,2)", key: "" },
+  ],
+  shipments: [
+    { name: "shipment_id", type: "uuid", key: "PK" },
+    { name: "order_id", type: "uuid", key: "FK" },
+    { name: "carrier", type: "varchar(100)", key: "" },
+    { name: "tracking_number", type: "varchar(100)", key: "" },
+  ],
+}
 
 export default function DatasourceDetail() {
+  const [selectedTable, setSelectedTable] = useState<string>("customers")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("全部")
+
+  const filteredTables = allTables.filter((t) => {
+    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus =
+      statusFilter === "全部" ||
+      (statusFilter === "已映射" && t.status === "success") ||
+      (statusFilter === "部分映射" && t.status === "info") ||
+      (statusFilter === "未映射" && t.status === "warning")
+    return matchesSearch && matchesStatus
+  })
+
+  const currentColumns = tableColumns[selectedTable] || []
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "success":
+        return { class: "badge-success", text: "已映射" }
+      case "info":
+        return { class: "badge-info", text: "部分映射" }
+      case "warning":
+        return { class: "badge-warning", text: "未映射" }
+      default:
+        return { class: "", text: status }
+    }
+  }
+
   return (
     <>
       <div className="datasource-header">
@@ -37,16 +114,22 @@ export default function DatasourceDetail() {
             <span className="text-sm text-secondary">erp-db.internal:5432</span>
           </div>
         </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
+          <button className="btn btn-secondary btn-sm">编辑</button>
+          <button className="btn btn-primary btn-sm">⟳ 重新扫描</button>
+        </div>
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--space-6)" }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--space-4)" }}>
         <div className="stat-card">
           <div className="stat-label">总表数</div>
-          <div className="stat-value">68</div>
+          <div className="stat-value">{allTables.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">已映射表</div>
-          <div className="stat-value" style={{ color: "var(--status-success)" }}>24</div>
+          <div className="stat-value" style={{ color: "var(--status-success)" }}>
+            {allTables.filter((t) => t.status === "success").length}
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">总记录数</div>
@@ -74,64 +157,81 @@ export default function DatasourceDetail() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">数据库表 (68)</span>
+          <span className="card-title">数据库表 ({filteredTables.length})</span>
           <div style={{ display: "flex", gap: "var(--space-3)" }}>
             <div className="search-input">
               <span className="icon">⌕</span>
-              <input type="text" placeholder="搜索表名..." style={{ width: 200 }} />
+              <input
+                type="text"
+                placeholder="搜索表名..."
+                style={{ width: 160 }}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <select className="form-select" style={{ width: 140 }}>
+            <select
+              className="form-select"
+              style={{ width: 120 }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
               <option>全部</option>
               <option>已映射</option>
+              <option>部分映射</option>
               <option>未映射</option>
             </select>
           </div>
         </div>
-        <div className="card-body">
-          <div className="table-grid">
-            {tables.map((t) => (
-              <div key={t.name} className="table-card">
-                <div className="table-card-header">
-                  <span className="table-card-name">{t.name}</span>
-                  <span className={`badge badge-${t.status === "success" ? "success" : t.status === "warning" ? "warning" : "info"}`}>
-                    {t.status === "success" ? "已映射" : t.status === "warning" ? "未映射" : "部分映射"}
-                  </span>
-                </div>
-                <div className="table-card-meta">
-                  <div>列数: <span>{t.cols}</span></div>
-                  <div>行数: <span>{t.rows.toLocaleString()}</span></div>
-                  <div>映射: <span>{t.mapped}</span></div>
-                  <div>更新: <span>{t.update}</span></div>
-                </div>
-                {t.pk && (
-                  <div className="table-card-tags">
-                    <span className="badge badge-draft">主键: {t.pk}</span>
+        <div className="card-body" style={{ padding: "var(--space-3)" }}>
+          <div className="table-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+            {filteredTables.map((t) => {
+              const badge = getStatusBadge(t.status)
+              const isSelected = selectedTable === t.name
+              return (
+                <div
+                  key={t.name}
+                  className={`table-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => setSelectedTable(t.name)}
+                >
+                  <div className="table-card-header">
+                    <span className="table-card-name">{t.name}</span>
+                    <span className={`badge ${badge.class}`}>{badge.text}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                  <div className="table-card-meta" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                    <div>列: <span>{t.cols}</span></div>
+                    <div>行: <span>{t.rows >= 1000 ? `${(t.rows / 1000).toFixed(1)}k` : t.rows}</span></div>
+                  </div>
+                  {t.pk && (
+                    <div className="table-card-tags">
+                      <span className="badge badge-draft">PK: {t.pk}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
-      </div>
 
-      <div className="card mt-4">
-        <div className="card-header">
-          <span className="card-title">customers 表结构</span>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm">查看数据</button>
-            <button className="btn btn-ghost btn-sm">映射到本体</button>
-          </div>
-        </div>
-        <div className="column-list">
-          {columns.map((c) => (
-            <div key={c.name} className="column-item">
-              <span className="ci-name">{c.name}</span>
-              <span className="ci-type">{c.type}</span>
-              {c.key === "PK" && <span className="ci-pk">PK</span>}
-              {c.key === "NN" && <span className="ci-key">NN</span>}
-              {c.key === "UQ" && <span className="ci-key">UQ</span>}
+          {selectedTable && currentColumns.length > 0 && (
+            <div className="table-detail" style={{ marginTop: "var(--space-4)" }}>
+              <div className="table-detail-header">
+                <span className="table-detail-title">{selectedTable}</span>
+                <span className="text-xs text-tertiary">{currentColumns.length} 列</span>
+              </div>
+              <div className="column-list-compact">
+                {currentColumns.map((col) => (
+                  <div key={col.name} className="column-item-compact">
+                    <span className="ci-name">{col.name}</span>
+                    <span className="ci-type">{col.type}</span>
+                    {col.key && (
+                      <span className={`badge badge-${col.key === "PK" ? "primary" : col.key === "FK" ? "secondary" : "draft"}`}>
+                        {col.key}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </>

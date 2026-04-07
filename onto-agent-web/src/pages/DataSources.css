@@ -19,6 +19,37 @@
   margin-bottom: var(--space-4);
 }
 
+.datasource-card-actions {
+  display: flex;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.datasource-card:hover .datasource-card-actions {
+  opacity: 1;
+}
+
+.datasource-card-actions .btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.datasource-card-actions .btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .datasource-card-title {
   display: flex;
   align-items: center;

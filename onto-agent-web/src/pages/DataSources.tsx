@@ -51,6 +51,7 @@ type ConnectionStatus = "idle" | "testing" | "success" | "error"
 export default function DataSources() {
   const navigate = useNavigate()
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [errors, setErrors] = useState<FormErrors>({})
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle")
@@ -90,12 +91,52 @@ export default function DataSources() {
 
   const handleCloseModal = () => {
     setShowModal(false)
+    setEditingId(null)
     setFormData(initialFormData)
     setErrors({})
     setConnectionStatus("idle")
     setConnectionMessage("")
     setSaveStatus("idle")
     setSaveMessage("")
+  }
+
+  const handleOpenAdd = () => {
+    setEditingId(null)
+    setFormData(initialFormData)
+    setShowModal(true)
+  }
+
+  const handleOpenEdit = (ds: Datasource) => {
+    setEditingId(ds.id)
+    setFormData({
+      name: ds.name,
+      type: ds.type,
+      host: ds.host || "",
+      port: ds.port?.toString() || "5432",
+      database: ds.database || "",
+      schema: ds.schema || "public",
+      username: ds.username || "",
+      password: ds.password || "",
+      description: "",
+      sslMode: ds.sslMode || "prefer",
+    })
+    setConnectionStatus("idle")
+    setConnectionMessage("")
+    setSaveStatus("idle")
+    setSaveMessage("")
+    setShowModal(true)
+  }
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm("确定要删除这个数据源吗？")) return
+    try {
+      await datasourceApi.delete(id)
+      setDatasources(datasources.filter(ds => ds.id !== id))
+    } catch (error) {
+      console.error("Failed to delete datasource:", error)
+      alert("删除失败，请重试")
+    }
   }
 
   const validateForm = (): boolean => {
@@ -166,22 +207,39 @@ export default function DataSources() {
     setSaveMessage("")
 
     try {
-      const newDs = await datasourceApi.create({
-        name: formData.name,
-        type: formData.type as "postgresql" | "mysql" | "sqlserver" | "oracle",
-        host: formData.host,
-        port: parseInt(formData.port),
-        database: formData.database,
-        schema: formData.schema || undefined,
-        username: formData.username,
-        password: formData.password,
-        sslMode: formData.sslMode,
-      })
+      let savedDs: Datasource
+
+      if (editingId) {
+        savedDs = await datasourceApi.update(editingId, {
+          name: formData.name,
+          type: formData.type as "postgresql" | "mysql" | "sqlserver" | "oracle",
+          host: formData.host,
+          port: parseInt(formData.port),
+          database: formData.database,
+          schema: formData.schema || undefined,
+          username: formData.username,
+          password: formData.password || undefined,
+          sslMode: formData.sslMode,
+        })
+        setDatasources(datasources.map(ds => ds.id === editingId ? savedDs : ds))
+        setSaveMessage("数据源更新成功！")
+      } else {
+        savedDs = await datasourceApi.create({
+          name: formData.name,
+          type: formData.type as "postgresql" | "mysql" | "sqlserver" | "oracle",
+          host: formData.host,
+          port: parseInt(formData.port),
+          database: formData.database,
+          schema: formData.schema || undefined,
+          username: formData.username,
+          password: formData.password,
+          sslMode: formData.sslMode,
+        })
+        setDatasources([savedDs, ...datasources])
+        setSaveMessage("数据源创建成功！")
+      }
 
       setSaveStatus("success")
-      setSaveMessage("数据源创建成功！正在扫描表结构...")
-
-      setDatasources([...datasources, newDs])
 
       setTimeout(() => {
         handleCloseModal()
@@ -189,7 +247,7 @@ export default function DataSources() {
       }, 1500)
     } catch (error: any) {
       setSaveStatus("error")
-      setSaveMessage(`保存失败: ${error.message}`)
+      setSaveMessage(`操作失败: ${error.message}`)
     }
   }
 
@@ -288,17 +346,13 @@ export default function DataSources() {
             <option>连接失败</option>
           </select>
         </div>
-        <div className="toolbar-right">
-          <button className="btn btn-ghost btn-sm">卡片视图</button>
-          <button className="btn btn-ghost btn-sm">列表视图</button>
-        </div>
       </div>
 
       <div className="datasource-grid">
         <button
           type="button"
           className="datasource-card add-card"
-          onClick={() => setShowModal(true)}
+          onClick={handleOpenAdd}
         >
           <div className="add-icon">+</div>
           <div className="add-text">添加数据源</div>
@@ -330,10 +384,29 @@ export default function DataSources() {
                     <div className="text-xs text-tertiary">{getTypeLabel(ds.type)}</div>
                   </div>
                 </div>
-                <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
-                  {ds.status === "connected" ? "已连接" : "连接失败"}
-                </span>
+                <div className="datasource-card-actions">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenEdit(ds)
+                    }}
+                    title="编辑"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={(e) => handleDelete(ds.id, e)}
+                    title="删除"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
+              <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
+                {ds.status === "connected" ? "已连接" : "连接失败"}
+              </span>
               <div className="text-sm text-secondary mb-4">{ds.database || "-"}</div>
               <div className="datasource-meta">
                 <div className="datasource-meta-item">
@@ -357,7 +430,7 @@ export default function DataSources() {
       <div className={`modal-overlay ${showModal ? "active" : ""}`} onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
         <div className="modal">
           <div className="modal-header">
-            <h3 className="modal-title">添加数据源</h3>
+            <h3 className="modal-title">{editingId ? "编辑数据源" : "添加数据源"}</h3>
             <button className="modal-close" onClick={handleCloseModal}>✕</button>
           </div>
           <div className="modal-body">
@@ -445,11 +518,11 @@ export default function DataSources() {
                 {errors.username && <div className="form-error">{errors.username}</div>}
               </div>
               <div className="form-group">
-                <label className="form-label">密码 <span className="required">*</span></label>
+                <label className="form-label">密码 {editingId ? "" : <span className="required">*</span>}</label>
                 <input
                   type="password"
                   className={`form-input ${errors.password ? "error" : ""}`}
-                  placeholder="••••••••"
+                  placeholder={editingId ? "留空表示不修改密码" : "••••••••"}
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
                 />
@@ -512,7 +585,7 @@ export default function DataSources() {
               onClick={handleSave}
               disabled={connectionStatus === "testing" || saveStatus === "saving"}
             >
-              {saveStatus === "saving" ? "保存中..." : "保存并扫描"}
+              {saveStatus === "saving" ? "保存中..." : (editingId ? "保存" : "创建")}
             </button>
           </div>
         </div>

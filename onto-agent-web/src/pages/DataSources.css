@@ -64,8 +64,12 @@
 
 .datasource-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-4);
+}
+
+.datasource-grid > * {
+  min-height: 180px;
 }
 
 .add-card {
@@ -79,14 +83,17 @@
   cursor: pointer;
   transition: all var(--transition-fast);
   padding: var(--space-5);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .add-card:focus {
   outline: none;
   border-color: var(--brand-primary);
   background: rgba(59, 130, 246, 0.05);
+}
+
+.add-card:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
 }
 
 .add-card:hover {

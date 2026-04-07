@@ -5,7 +5,7 @@ import "./Header.css"
 const routeNames: Record<string, string> = {
   "/": "仪表盘",
   "/data-sources": "数据源管理",
-  "/ontologies": "本体列表",
+  "/ontologies": "本体管理",
   "/mapping": "数据映射",
   "/query": "语义查询",
   "/nl-query": "自然语言查询",
@@ -49,8 +49,8 @@ function getBreadcrumb(pathname: string) {
   if (pathname.startsWith("/ontologies/")) {
     return [
       { label: "首页", href: "/" },
-      { label: "本体列表", href: "/ontologies" },
-      { label: "本体建模" },
+      { label: "本体管理", href: "/ontologies" },
+      { label: "本体详情" },
     ]
   }
 
@@ -80,12 +80,12 @@ export function Header() {
         <div className="header-breadcrumb">
           {breadcrumbs.map((crumb, index) => (
             <span key={index}>
-              {index > 0 && <span className="separator">/</span>}
               {crumb.href ? (
                 <Link to={crumb.href}>{crumb.label}</Link>
               ) : (
                 <span className={index === breadcrumbs.length - 1 ? "current" : ""}>{crumb.label}</span>
               )}
+              {index < breadcrumbs.length - 1 && <span className="separator">/</span>}
             </span>
           ))}
         </div>

@@ -74,6 +74,15 @@ dist/
 venv/
 .env/
 .venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+*.pex
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.uv/
 
 # Java
 *.class

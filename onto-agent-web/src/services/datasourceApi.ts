@@ -75,6 +75,13 @@ export interface TestResult {
   error?: string
 }
 
+export interface ScanResult {
+  status: "completed" | "failed"
+  tables: TableInfo[]
+  scannedAt: string
+  error?: string
+}
+
 interface ApiResponse<T> {
   success: boolean
   data: T
@@ -131,7 +138,11 @@ export const datasourceApi = {
       body: JSON.stringify(dto),
     }),
 
-  test: (id: string) => request<TestResult>(`/datasources/${id}/test`),
+  test: (id: string) => 
+    request<TestResult>(`/datasources/${id}/test`, { method: "POST" }),
+
+  scan: (id: string) =>
+    request<ScanResult>(`/datasources/${id}/scan`, { method: "POST" }),
 
   getTables: (id: string) =>
     request<{ tables: TableInfo[]; scannedAt: string }>(

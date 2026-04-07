@@ -235,6 +235,12 @@ export default function DataSources() {
           password: formData.password,
           sslMode: formData.sslMode,
         })
+        const testResult = await datasourceApi.test(savedDs.id)
+        savedDs = {
+          ...savedDs,
+          status: testResult.connected ? "connected" as const : "error" as const,
+          tableCount: testResult.tableCount || 0,
+        }
         setDatasources([savedDs, ...datasources])
         setSaveMessage("数据源创建成功！")
       }
@@ -273,7 +279,7 @@ export default function DataSources() {
     const matchesStatus =
       statusFilter === "全部状态" ||
       (statusFilter === "已连接" && ds.status === "connected") ||
-      (statusFilter === "连接失败" && ds.status === "error")
+      (statusFilter === "连接失败" && (ds.status === "error" || ds.status === "disconnected"))
     return matchesSearch && matchesStatus
   })
 
@@ -290,19 +296,6 @@ export default function DataSources() {
     return labels[type] || type
   }
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "从未"
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return "刚刚"
-    if (minutes < 60) return `${minutes}分钟前`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}小时前`
-    return date.toLocaleDateString("zh-CN")
-  }
-
   return (
     <>
       <div className="stats-grid">
@@ -317,10 +310,6 @@ export default function DataSources() {
         <div className="stat-card">
           <div className="stat-label">总表数</div>
           <div className="stat-value">{loading ? "-" : totalTables}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">已映射表</div>
-          <div className="stat-value">-</div>
         </div>
       </div>
 
@@ -407,19 +396,15 @@ export default function DataSources() {
               <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
                 {ds.status === "connected" ? "已连接" : "连接失败"}
               </span>
-              <div className="text-sm text-secondary mb-4">{ds.database || "-"}</div>
               <div className="datasource-meta">
                 <div className="datasource-meta-item">
-                  主机: <span>{ds.host || "-"}</span>
+                  主机: <span>{ds.host ? `${ds.host}:${ds.port}` : "-"}</span>
                 </div>
                 <div className="datasource-meta-item">
                   数据库: <span>{ds.database || "-"}</span>
                 </div>
                 <div className="datasource-meta-item">
                   表数: <span>{ds.tableCount >= 0 ? ds.tableCount : "-"}</span>
-                </div>
-                <div className="datasource-meta-item">
-                  最后同步: <span>{formatDate(ds.lastSyncAt)}</span>
                 </div>
               </div>
             </div>

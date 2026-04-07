@@ -22,7 +22,7 @@ export default function DatasourceDetail() {
 
   useEffect(() => {
     if (datasource && datasource.status === "connected" && tables.length === 0) {
-      loadTables()
+      handleScan()
     }
   }, [datasource])
 
@@ -45,14 +45,20 @@ export default function DatasourceDetail() {
     }
   }
 
-  const loadTables = async () => {
-    if (!id) return
+  const handleScan = async () => {
+    if (!id || datasource?.status !== "connected") return
     try {
       setLoadingTables(true)
-      const result = await datasourceApi.getTables(id)
+      const result = await datasourceApi.scan(id)
       setTables(result.tables)
+      setDatasource(prev => prev ? {
+        ...prev,
+        status: "connected",
+        tableCount: result.tables.length,
+      } : null)
     } catch (error) {
-      console.error("Failed to load tables:", error)
+      console.error("Failed to scan datasource:", error)
+      setDatasource(prev => prev ? { ...prev, status: "error" } : null)
     } finally {
       setLoadingTables(false)
     }
@@ -86,23 +92,6 @@ export default function DatasourceDetail() {
     return labels[type] || type
   }
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "从未"
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return "刚刚"
-    if (minutes < 60) return `${minutes} 分钟前`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} 小时前`
-    const days = Math.floor(hours / 24)
-    if (days < 30) return `${days} 天前`
-    return date.toLocaleDateString("zh-CN")
-  }
-
-  const totalRows = tables.reduce((sum, t) => sum + t.rowCount, 0)
-
   return (
     <>
       <div className="datasource-header">
@@ -134,11 +123,13 @@ export default function DatasourceDetail() {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
           <button className="btn btn-secondary btn-sm">编辑</button>
-          <button className="btn btn-primary btn-sm" onClick={loadTables}>⟳ 同步</button>
+          <button className="btn btn-primary btn-sm" onClick={handleScan} disabled={loadingTables || datasource?.status !== "connected"}>
+            {loadingTables ? "同步中..." : "同步"}
+          </button>
         </div>
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: "var(--space-4)" }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", marginBottom: "var(--space-4)" }}>
         <div className="stat-card">
           <div className="stat-label">总表数</div>
           <div className="stat-value">{loadingTables ? "-" : tables.length}</div>
@@ -148,16 +139,6 @@ export default function DatasourceDetail() {
           <div className="stat-value" style={{ color: datasource?.status === "connected" ? "var(--status-success)" : "var(--status-warning)" }}>
             {datasource?.status === "connected" ? "正常" : "未同步"}
           </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">总记录数</div>
-          <div className="stat-value">
-            {loadingTables ? "-" : totalRows >= 1000000 ? `${(totalRows / 1000000).toFixed(1)}M` : totalRows >= 1000 ? `${(totalRows / 1000).toFixed(1)}k` : totalRows}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">最后同步</div>
-          <div className="stat-value text-sm">{formatDate(datasource?.lastSyncAt || null)}</div>
         </div>
       </div>
 

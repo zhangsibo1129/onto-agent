@@ -85,7 +85,7 @@ async def get_postgres_tables(
             TableInfo(
                 name=row["table_name"],
                 columns=row["columns"],
-                row_count=row["row_count"],
+                row_count=max(0, row["row_count"] or 0),
             )
             for row in rows
         ]

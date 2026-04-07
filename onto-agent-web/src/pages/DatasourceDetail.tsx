@@ -154,10 +154,10 @@ export default function DatasourceDetail() {
 
       <div className="detail-layout">
         <div className="detail-left">
-          <div className="card-header" style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--border-primary)" }}>
-            <span className="card-title">数据库表 ({filteredTables.length})</span>
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
-              <div className="search-input" style={{ width: 140 }}>
+          <div className="detail-left-header">
+            <span className="detail-left-title">数据库表 ({filteredTables.length})</span>
+            <div className="detail-left-controls">
+              <div className="search-input">
                 <span className="icon">⌕</span>
                 <input
                   type="text"
@@ -168,7 +168,6 @@ export default function DatasourceDetail() {
               </div>
               <select
                 className="form-select"
-                style={{ width: 100 }}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >

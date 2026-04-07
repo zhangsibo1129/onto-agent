@@ -234,6 +234,12 @@ export default function DataSources() {
           sslMode: formData.sslMode,
           description: formData.description || undefined,
         })
+        const testResult = await datasourceApi.test(savedDs.id)
+        savedDs = {
+          ...savedDs,
+          status: testResult.connected ? "connected" as const : "error" as const,
+          tableCount: testResult.tableCount || 0,
+        }
         setDatasources(datasources.map(ds => ds.id === editingId ? savedDs : ds))
         setSaveMessage("数据源更新成功！")
       } else {
@@ -297,7 +303,6 @@ export default function DataSources() {
     return matchesSearch && matchesStatus
   })
 
-  const totalTables = datasources.reduce((sum, ds) => sum + (ds.tableCount || 0), 0)
   const connectedCount = datasources.filter((ds) => ds.status === "connected").length
 
   const getTypeLabel = (type: string) => {
@@ -312,22 +317,7 @@ export default function DataSources() {
 
   return (
     <>
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <div className="stat-card">
-          <div className="stat-label">数据源总数</div>
-          <div className="stat-value">{loading ? "-" : datasources.length}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">连接正常</div>
-          <div className="stat-value" style={{ color: "var(--status-success)" }}>{loading ? "-" : connectedCount}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">总表数</div>
-          <div className="stat-value">{loading ? "-" : totalTables}</div>
-        </div>
-      </div>
-
-      <div className="toolbar">
+      <div className="toolbar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="toolbar-left">
           <div className="search-input">
             <span className="icon">⌕</span>
@@ -349,17 +339,18 @@ export default function DataSources() {
             <option>连接失败</option>
           </select>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: connectedCount > 0 ? "var(--status-success)" : "var(--status-error)" }}></span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              {loading ? "-" : `${connectedCount}/${datasources.length}`}
+            </span>
+          </span>
+          <button className="btn btn-primary btn-sm" onClick={handleOpenAdd}>+ 添加数据源</button>
+        </div>
       </div>
 
       <div className="datasource-grid">
-        <button
-          type="button"
-          className="datasource-card add-card"
-          onClick={handleOpenAdd}
-        >
-          <div className="add-icon">+</div>
-          <div className="add-text">添加数据源</div>
-        </button>
         {loading ? (
           <div className="datasource-card" style={{ opacity: 0.5 }}>
             <div className="text-sm text-tertiary">加载中...</div>
@@ -383,8 +374,13 @@ export default function DataSources() {
                     ⬡
                   </div>
                   <div>
-                    <div className="datasource-name">{ds.name}</div>
-                    <div className="text-xs text-tertiary">{getTypeLabel(ds.type)}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                      <div className="datasource-name">{ds.name}</div>
+                      <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
+                        {ds.status === "connected" ? "已连接" : "连接失败"}
+                      </span>
+                    </div>
+                    <div className="text-xs text-tertiary">{getTypeLabel(ds.type)} · {ds.host}:{ds.port}</div>
                   </div>
                 </div>
                 <div className="datasource-card-actions">
@@ -407,20 +403,13 @@ export default function DataSources() {
                   </button>
                 </div>
               </div>
-              <span className={`badge ${ds.status === "connected" ? "badge-success" : "badge-error"}`}>
-                {ds.status === "connected" ? "已连接" : "连接失败"}
-              </span>
-              {ds.description && <div className="text-sm text-secondary mb-2">{ds.description}</div>}
+              <div className="datasource-description">
+                {ds.description || "暂无描述"}
+              </div>
               <div className="datasource-meta">
-                <div className="datasource-meta-item">
-                  主机: <span>{ds.host ? `${ds.host}:${ds.port}` : "-"}</span>
-                </div>
-                <div className="datasource-meta-item">
-                  数据库: <span>{ds.database || "-"}</span>
-                </div>
-                <div className="datasource-meta-item">
-                  表数: <span>{ds.tableCount >= 0 ? ds.tableCount : "-"}</span>
-                </div>
+                <span>数据库: {ds.database || "-"}</span>
+                <span>·</span>
+                <span>表数: {ds.tableCount >= 0 ? ds.tableCount : "-"}</span>
               </div>
             </div>
           ))

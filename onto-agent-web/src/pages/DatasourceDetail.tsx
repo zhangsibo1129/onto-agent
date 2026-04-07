@@ -95,77 +95,64 @@ export default function DatasourceDetail() {
 
   return (
     <>
-      <div className="datasource-header">
-        <div className="datasource-icon-lg">⬡</div>
-        <div className="datasource-info">
-          {loading ? (
-            <h2>加载中...</h2>
-          ) : datasource ? (
-            <>
-              <h2>{datasource.name}</h2>
-              <div className="connection-badge">
-                <div className="connection-dot" style={{ background: datasource.status === "connected" ? "var(--status-success)" : "var(--status-error)" }}></div>
-                <span className="text-sm" style={{ color: datasource.status === "connected" ? "var(--status-success)" : "var(--status-error)" }}>
-                  {datasource.status === "connected" ? "已连接" : "连接失败"}
-                </span>
-                <span className="text-sm text-tertiary">·</span>
-                <span className="text-sm text-secondary">{getTypeLabel(datasource.type)}</span>
-                {datasource.host && (
-                  <>
-                    <span className="text-sm text-tertiary">·</span>
-                    <span className="text-sm text-secondary">{datasource.host}:{datasource.port}</span>
-                  </>
-                )}
-              </div>
-            </>
-          ) : (
-            <h2>数据源不存在</h2>
-          )}
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/data-sources', { state: { editId: id } })}>编辑</button>
-          <button className="btn btn-primary btn-sm" onClick={handleScan} disabled={loadingTables || datasource?.status !== "connected"}>
-            {loadingTables ? "同步中..." : "同步"}
-          </button>
-        </div>
-      </div>
-
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(1, 1fr)", marginBottom: "var(--space-4)" }}>
-        <div className="stat-card">
-          <div className="stat-label">总表数</div>
-          <div className="stat-value">{loadingTables ? "-" : tables.length}</div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: "var(--space-4)" }}>
-        <div className="card-header">
-          <span className="card-title">连接信息</span>
-        </div>
-        <div className="card-body">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-4)" }}>
-            <div><div className="text-xs text-tertiary mb-1">主机地址</div><div className="text-sm mono">{datasource?.host || "-"}</div></div>
-            <div><div className="text-xs text-tertiary mb-1">端口</div><div className="text-sm mono">{datasource?.port || "-"}</div></div>
-            <div><div className="text-xs text-tertiary mb-1">数据库</div><div className="text-sm mono">{datasource?.database || "-"}</div></div>
-            <div><div className="text-xs text-tertiary mb-1">Schema</div><div className="text-sm mono">{datasource?.schema || "public"}</div></div>
+      <div style={{ marginBottom: "var(--space-5)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <div className="datasource-icon-lg">⬡</div>
+            <div>
+              {loading ? (
+                <h2>加载中...</h2>
+              ) : datasource ? (
+                <h2 style={{ marginBottom: "var(--space-1)" }}>{datasource.name}</h2>
+              ) : (
+                <h2>数据源不存在</h2>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/data-sources', { state: { editId: id } })}>编辑</button>
+            <button className="btn btn-primary btn-sm" onClick={handleScan} disabled={loadingTables || datasource?.status !== "connected"}>
+              {loadingTables ? "同步中..." : "同步"}
+            </button>
           </div>
         </div>
-      </div>
 
-      {datasource?.description && (
-        <div className="card" style={{ marginBottom: "var(--space-4)" }}>
-          <div className="card-header">
-            <span className="card-title">描述</span>
+        {datasource && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-4)", alignItems: "center", fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: datasource.status === "connected" ? "var(--status-success)" : "var(--status-error)" }}></span>
+              <span style={{ color: datasource.status === "connected" ? "var(--status-success)" : "var(--status-error)" }}>
+                {datasource.status === "connected" ? "已连接" : "连接失败"}
+              </span>
+            </span>
+            <span style={{ color: "var(--text-tertiary)" }}>·</span>
+            <span>{getTypeLabel(datasource.type)}</span>
+            <span style={{ color: "var(--text-tertiary)" }}>·</span>
+            <span className="mono">{datasource.host}:{datasource.port}</span>
+            <span style={{ color: "var(--text-tertiary)" }}>·</span>
+            <span>{datasource.database}</span>
+            {datasource.schema && (
+              <>
+                <span style={{ color: "var(--text-tertiary)" }}>·</span>
+                <span>{datasource.schema}</span>
+              </>
+            )}
+            <span style={{ color: "var(--text-tertiary)" }}>·</span>
+            <span>{loadingTables ? "-" : tables.length} 表</span>
           </div>
-          <div className="card-body">
-            <div className="text-sm">{datasource.description}</div>
+        )}
+
+        {datasource?.description && (
+          <div style={{ marginTop: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--text-tertiary)" }}>
+            {datasource.description}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="detail-layout">
         <div className="detail-left">
           <div className="detail-left-header">
-            <span className="detail-left-title">数据库表 ({loadingTables ? "..." : filteredTables.length})</span>
+            <span className="detail-left-title">表 ({loadingTables ? "..." : filteredTables.length})</span>
             <div className="detail-left-controls">
               <div className="search-input">
                 <span className="icon">⌕</span>
@@ -230,8 +217,8 @@ export default function DatasourceDetail() {
                   </div>
                   {columns.map((col) => (
                     <div key={col.name} className="column-table-row">
-                      <span className="col-name">{col.name}</span>
-                      <span className="col-type">{col.type}</span>
+                      <span className="col-name" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>{col.name}</span>
+                      <span className="col-type" style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>{col.type}</span>
                       <span>
                         {col.primaryKey && (
                           <span className="badge badge-primary">PK</span>

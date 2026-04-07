@@ -130,16 +130,10 @@ export default function DatasourceDetail() {
         </div>
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", marginBottom: "var(--space-4)" }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: "repeat(1, 1fr)", marginBottom: "var(--space-4)" }}>
         <div className="stat-card">
           <div className="stat-label">总表数</div>
           <div className="stat-value">{loadingTables ? "-" : tables.length}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">同步状态</div>
-          <div className="stat-value" style={{ color: datasource?.status === "connected" ? "var(--status-success)" : "var(--status-warning)" }}>
-            {datasource?.status === "connected" ? "正常" : "未同步"}
-          </div>
         </div>
       </div>
 
@@ -207,8 +201,6 @@ export default function DatasourceDetail() {
                     </div>
                     <div className="table-list-meta">
                       <span>{t.columns} 列</span>
-                      <span>·</span>
-                      <span>{t.rowCount >= 1000 ? `${(t.rowCount / 1000).toFixed(1)}k` : t.rowCount} 行</span>
                     </div>
                   </div>
                 )

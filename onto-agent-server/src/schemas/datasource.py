@@ -1,0 +1,71 @@
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
+
+class DatasourceBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    type: str = Field(..., min_length=1, max_length=50)
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    username: Optional[str] = None
+    password: Optional[str] = None
+    ssl_mode: Optional[str] = None
+
+
+class DatasourceCreate(DatasourceBase):
+    pass
+
+
+class DatasourceUpdate(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    database: Optional[str] = None
+    db_schema: Optional[str] = Field(default=None, serialization_alias="schema")
+    username: Optional[str] = None
+    password: Optional[str] = None
+    ssl_mode: Optional[str] = None
+
+
+class DatasourceResponse(DatasourceBase):
+    id: str
+    status: str
+    table_count: int
+    last_sync_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TableInfo(BaseModel):
+    name: str
+    columns: int
+    row_count: int
+
+
+class ColumnInfo(BaseModel):
+    name: str
+    type: str
+    nullable: bool
+    primary_key: bool
+    default_value: Optional[str] = None
+
+
+class TestResult(BaseModel):
+    connected: bool
+    latency: Optional[str] = None
+    version: Optional[str] = None
+    table_count: Optional[int] = None
+    error: Optional[str] = None
+
+
+class ApiResponse(BaseModel):
+    success: bool = True
+    data: Optional[dict] = None
+    error: Optional[dict] = None

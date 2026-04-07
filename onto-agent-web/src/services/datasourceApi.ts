@@ -84,6 +84,19 @@ interface ApiResponse<T> {
   }
 }
 
+function snakeToCamel(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(snakeToCamel)
+  } else if (obj !== null && typeof obj === "object") {
+    return Object.keys(obj).reduce((acc, key) => {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+      acc[camelKey] = snakeToCamel(obj[key])
+      return acc
+    }, {} as any)
+  }
+  return obj
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -102,7 +115,7 @@ async function request<T>(
     throw new Error(json.error?.message || "Request failed")
   }
 
-  return json.data
+  return snakeToCamel(json.data)
 }
 
 export const datasourceApi = {

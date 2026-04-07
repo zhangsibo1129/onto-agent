@@ -219,7 +219,7 @@ export default function DataSources() {
     return matchesSearch && matchesStatus
   })
 
-  const totalTables = datasources.reduce((sum, ds) => sum + ds.tableCount, 0)
+  const totalTables = datasources.reduce((sum, ds) => sum + (ds.tableCount || 0), 0)
   const connectedCount = datasources.filter((ds) => ds.status === "connected").length
 
   const getTypeLabel = (type: string) => {

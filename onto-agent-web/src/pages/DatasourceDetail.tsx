@@ -1,14 +1,14 @@
 import { useState } from "react"
 
 const allTables = [
-  { name: "customers", status: "success", cols: 15, rows: 12450, mapped: "客户360", update: "1小时前", pk: "customer_id" },
-  { name: "orders", status: "success", cols: 18, rows: 156789, mapped: "订单全景", update: "30分钟前", pk: "order_id" },
-  { name: "products", status: "success", cols: 12, rows: 3456, mapped: "订单全景", update: "2小时前", pk: "product_id" },
-  { name: "invoices", status: "success", cols: 20, rows: 89234, mapped: "客户360", update: "1小时前", pk: "invoice_id" },
-  { name: "addresses", status: "info", cols: 10, rows: 23567, mapped: "6/10 列", update: "3小时前", pk: "address_id" },
-  { name: "contacts", status: "warning", cols: 14, rows: 34567, mapped: "-", update: "1天前", pk: "" },
-  { name: "accounts", status: "success", cols: 8, rows: 5678, mapped: "客户360", update: "2小时前", pk: "account_id" },
-  { name: "shipments", status: "info", cols: 16, rows: 12345, mapped: "4/16 列", update: "30分钟前", pk: "shipment_id" },
+  { name: "customers", cols: 15, rows: 12450, update: "1小时前", pk: "customer_id" },
+  { name: "orders", cols: 18, rows: 156789, update: "30分钟前", pk: "order_id" },
+  { name: "products", cols: 12, rows: 3456, update: "2小时前", pk: "product_id" },
+  { name: "invoices", cols: 20, rows: 89234, update: "1小时前", pk: "invoice_id" },
+  { name: "addresses", cols: 10, rows: 23567, update: "3小时前", pk: "address_id" },
+  { name: "contacts", cols: 14, rows: 34567, update: "1天前", pk: "" },
+  { name: "accounts", cols: 8, rows: 5678, update: "2小时前", pk: "account_id" },
+  { name: "shipments", cols: 16, rows: 12345, update: "30分钟前", pk: "shipment_id" },
 ]
 
 const tableColumns: Record<string, { name: string; type: string; key: string }[]> = {
@@ -72,32 +72,12 @@ const tableColumns: Record<string, { name: string; type: string; key: string }[]
 export default function DatasourceDetail() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("全部")
 
-  const filteredTables = allTables.filter((t) => {
-    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus =
-      statusFilter === "全部" ||
-      (statusFilter === "已映射" && t.status === "success") ||
-      (statusFilter === "部分映射" && t.status === "info") ||
-      (statusFilter === "未映射" && t.status === "warning")
-    return matchesSearch && matchesStatus
-  })
+  const filteredTables = allTables.filter((t) =>
+    t.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const currentColumns = selectedTable ? (tableColumns[selectedTable] || []) : []
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "success":
-        return { class: "badge-success", text: "已映射" }
-      case "info":
-        return { class: "badge-info", text: "部分映射" }
-      case "warning":
-        return { class: "badge-warning", text: "未映射" }
-      default:
-        return { class: "", text: status }
-    }
-  }
 
   return (
     <>
@@ -116,7 +96,7 @@ export default function DatasourceDetail() {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: "var(--space-2)" }}>
           <button className="btn btn-secondary btn-sm">编辑</button>
-          <button className="btn btn-primary btn-sm">⟳ 重新扫描</button>
+          <button className="btn btn-primary btn-sm">⟳ 同步</button>
         </div>
       </div>
 
@@ -126,10 +106,8 @@ export default function DatasourceDetail() {
           <div className="stat-value">{allTables.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">已映射表</div>
-          <div className="stat-value" style={{ color: "var(--status-success)" }}>
-            {allTables.filter((t) => t.status === "success").length}
-          </div>
+          <div className="stat-label">同步状态</div>
+          <div className="stat-value" style={{ color: "var(--status-success)" }}>正常</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">总记录数</div>
@@ -142,6 +120,9 @@ export default function DatasourceDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: "var(--space-4)" }}>
+        <div className="card-header">
+          <span className="card-title">连接信息</span>
+        </div>
         <div className="card-body">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-4)" }}>
             <div><div className="text-xs text-tertiary mb-1">主机地址</div><div className="text-sm mono">erp-db.internal</div></div>
@@ -166,21 +147,10 @@ export default function DatasourceDetail() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <select
-                className="form-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option>全部</option>
-                <option>已映射</option>
-                <option>部分映射</option>
-                <option>未映射</option>
-              </select>
             </div>
           </div>
           <div className="table-list">
             {filteredTables.map((t) => {
-              const badge = getStatusBadge(t.status)
               const isSelected = selectedTable === t.name
               return (
                 <div
@@ -190,14 +160,13 @@ export default function DatasourceDetail() {
                 >
                   <div className="table-list-item-main">
                     <span className="table-list-name">{t.name}</span>
-                    <span className={`badge ${badge.class}`}>{badge.text}</span>
                   </div>
                   <div className="table-list-meta">
                     <span>{t.cols} 列</span>
                     <span>·</span>
                     <span>{t.rows >= 1000 ? `${(t.rows / 1000).toFixed(1)}k` : t.rows} 行</span>
-                    {t.pk && <span>·</span>}
-                    {t.pk && <span className="pk-badge">PK: {t.pk}</span>}
+                    <span>·</span>
+                    <span>{t.update}</span>
                   </div>
                 </div>
               )
@@ -210,7 +179,7 @@ export default function DatasourceDetail() {
             {selectedTable ? (
               <>
                 <div className="card-header">
-                  <span className="card-title">{selectedTable} 表结构</span>
+                  <span className="card-title">{selectedTable}</span>
                   <span className="text-xs text-tertiary">{currentColumns.length} 列</span>
                 </div>
                 <div className="column-table">

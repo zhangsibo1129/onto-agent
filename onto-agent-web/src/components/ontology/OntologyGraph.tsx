@@ -50,14 +50,12 @@ const COLORS = {
   nodeBg: "rgba(30, 41, 59, 0.95)",
   nodeBorder: "rgba(255, 255, 255, 0.15)",
   nodeBorderSelected: "#6366F1",
-  nodeHeaderBg: "rgba(99, 102, 241, 0.15)",
 
   text: "#F1F5F9",
   textSecondary: "#94A3B8",
   textMuted: "#64748B",
 
   linkDefault: "#475569",
-  linkHighlight: "#F59E0B",
 
   panelBg: "rgba(30, 41, 59, 0.98)",
   panelBorder: "rgba(255, 255, 255, 0.1)",
@@ -560,7 +558,6 @@ interface OntologyGraphProps {
 
 export default function OntologyGraph({
   data,
-  selectedClassId: _selectedClassId,
   onClassSelect,
   width = 800,
   height = 600,
@@ -568,7 +565,6 @@ export default function OntologyGraph({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<ForceGraphMethods<GraphNode, GraphLink>>(null) as any
   const containerRef = useRef<HTMLDivElement>(null)
-  const hoveredIdRef = useRef<string | null>(null)
   const [dimensions, setDimensions] = useState({ width, height })
   const [zoomLevel, setZoomLevel] = useState(1)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -685,7 +681,6 @@ export default function OntologyGraph({
     (node: NodeObject | null) => {
       const id = node ? (node as GraphNode).id : null
       if (!isDraggingRef.current) {
-        hoveredIdRef.current = id
         setHoveredId(id)
       }
       if (containerRef.current) {
@@ -694,6 +689,10 @@ export default function OntologyGraph({
     },
     []
   )
+
+  const onZoom = useCallback((transform: { k: number }) => {
+    setZoomLevel(transform.k)
+  }, [])
 
   return (
     <div
@@ -734,7 +733,7 @@ export default function OntologyGraph({
         onNodeHover={onNodeHover}
         onNodeDrag={onNodeDrag}
         onNodeDragEnd={onNodeDragEnd}
-        onZoom={(transform) => setZoomLevel(transform.k)}
+        onZoom={onZoom}
         cooldownTicks={200}
         d3AlphaDecay={0.02}
         d3VelocityDecay={0.4}

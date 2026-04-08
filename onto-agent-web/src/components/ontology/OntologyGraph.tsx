@@ -606,6 +606,7 @@ interface OntologyGraphProps {
   data: OntologyGraphData
   selectedClassId?: string | null
   onClassSelect?: (classId: string | null) => void
+  onLinkClick?: (link: GraphLink | null) => void
   width?: number
   height?: number
 }
@@ -613,6 +614,7 @@ interface OntologyGraphProps {
 export default function OntologyGraph({
   data,
   onClassSelect,
+  onLinkClick,
   width = 800,
   height = 600,
 }: OntologyGraphProps) {
@@ -773,6 +775,13 @@ export default function OntologyGraph({
     []
   )
 
+  const handleLinkClickInternal = useCallback(
+    (link: LinkObject) => {
+      onLinkClick?.(link as GraphLink)
+    },
+    [onLinkClick]
+  )
+
   const onZoom = useCallback((transform: { k: number }) => {
     requestAnimationFrame(() => setZoomLevel(transform.k))
   }, [])
@@ -815,6 +824,7 @@ export default function OntologyGraph({
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
         onLinkHover={onLinkHover}
+        onLinkClick={handleLinkClickInternal}
         onNodeDrag={onNodeDrag}
         onNodeDragEnd={onNodeDragEnd}
         onZoom={onZoom}

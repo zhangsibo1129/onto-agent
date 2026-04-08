@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { OntologyGraph } from "@/components/ontology"
-import type { OntologyGraphData } from "@/components/ontology"
+import type { OntologyGraphData, ObjectProperty as GraphObjectProperty } from "@/components/ontology"
 import {
   ontologyApi,
   type Ontology,
@@ -46,6 +46,7 @@ export default function OntologyModeling() {
   const [objectProperties, setObjectProperties] = useState<ObjectProperty[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [selectedRelation, setSelectedRelation] = useState<GraphObjectProperty | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "dataProperty" | "objectProperty" | null>(null)
 
   useEffect(() => {
@@ -66,6 +67,16 @@ export default function OntologyModeling() {
   const handleClassSelect = useCallback((classId: string | null) => {
     setSelectedClassId(classId)
   }, [])
+
+  const handleLinkClick = useCallback((link: { propertyId: string } | null) => {
+    if (!link) {
+      setSelectedRelation(null)
+      return
+    }
+    const propId = link.propertyId.split("|")[0]
+    const prop = objectProperties.find(p => p.id === propId)
+    setSelectedRelation(prop || null)
+  }, [objectProperties])
 
   const handleCreateClass = useCallback(
     async (name: string, displayName: string, superClass?: string) => {
@@ -243,7 +254,76 @@ export default function OntologyModeling() {
 
       {/* ---- Graph + Panel ---- */}
       <div className="graph-wrapper">
-        <OntologyGraph data={graphData} selectedClassId={selectedClassId} onClassSelect={handleClassSelect} />
+        <OntologyGraph data={graphData} selectedClassId={selectedClassId} onClassSelect={handleClassSelect} onLinkClick={handleLinkClick} />
+
+        {/* ---- Relation Panel ---- */}
+        <div className={`relation-panel ${selectedRelation ? "active" : ""}`}>
+          {selectedRelation && (
+            <>
+              <div className="panel-header">
+                <div className="panel-title">
+                  <svg className="panel-icon" viewBox="0 0 16 16" width="16" height="16">
+                    <line x1="1" y1="8" x2="10" y2="8" stroke="#F59E0B" strokeWidth="2" />
+                    <polygon points="8,4 14,8 8,12" fill="#F59E0B" />
+                  </svg>
+                  <span className="panel-name">{selectedRelation.displayName || selectedRelation.name}</span>
+                </div>
+                <button className="panel-close" onClick={() => setSelectedRelation(null)}>
+                  <svg viewBox="0 0 24 24" width="14" height="14">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+              <div className="panel-body">
+                <div className="panel-section">
+                  <div className="section-title">基本信息</div>
+                  <div className="basic-info">
+                    <div className="basic-info-row">
+                      <span className="basic-label">URL</span>
+                      <span className="basic-value url">{baseIri}{selectedRelation.name}</span>
+                    </div>
+                    {selectedRelation.description && (
+                      <div className="basic-info-row">
+                        <span className="basic-label">描述</span>
+                        <span className="basic-value">{selectedRelation.description}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="panel-section">
+                  <div className="section-title">定义域</div>
+                  <div className="basic-tags">
+                    {(selectedRelation.domainIds || []).map((did) => (
+                      <span key={did} className="rel-tag" onClick={() => setSelectedClassId(did)}>
+                        {getClassById(did)?.displayName || did}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="panel-section">
+                  <div className="section-title">值域</div>
+                  <div className="basic-tags">
+                    {(selectedRelation.rangeIds || []).map((rid) => (
+                      <span key={rid} className="rel-tag" onClick={() => setSelectedClassId(rid)}>
+                        {getClassById(rid)?.displayName || rid}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {(selectedRelation.characteristics || []).length > 0 && (
+                  <div className="panel-section">
+                    <div className="section-title">特性</div>
+                    <div className="basic-tags">
+                      {(selectedRelation.characteristics || []).map((c) => (
+                        <span key={c} className="char-badge">{CHARACTERISTIC_LABELS[c] || c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* ---- Entity Panel ---- */}
         <div className={`entity-panel ${selectedClass ? "active" : ""}`}>
@@ -320,32 +400,42 @@ export default function OntologyModeling() {
                   <div className="section-title">关系</div>
                   {(incomingRelations.length > 0 || outgoingRelations.length > 0) ? (
                     <div className="relations-list">
-                      {outgoingRelations.map((rel) => (
-                        <div key={rel.id} className="rel-item">
-                          <span className="rel-col">{selectedClass.displayName || selectedClass.name}</span>
-                          <span className="rel-col">
-                            <span className="obj-prop-tag">{getPropertyById(rel.propertyId)?.displayName || rel.propertyId}</span>
-                          </span>
-                          <span className="rel-col">
-                            <span className="rel-tag" onClick={() => setSelectedClassId(rel.targetId)}>
-                              {getClassById(rel.targetId)?.displayName || rel.targetId}
+                      {outgoingRelations.map((rel) => {
+                        const prop = getPropertyById(rel.propertyId)
+                        return (
+                          <div key={rel.id} className="rel-item">
+                            <span className="rel-col">{selectedClass.displayName || selectedClass.name}</span>
+                            <span className="rel-col">
+                              <span className="obj-prop-tag" onClick={() => prop && handleLinkClick({ propertyId: rel.propertyId })}>
+                                {prop?.displayName || rel.propertyId}
+                              </span>
                             </span>
-                          </span>
-                        </div>
-                      ))}
-                      {incomingRelations.map((rel) => (
-                        <div key={rel.id} className="rel-item">
-                          <span className="rel-col">
-                            <span className="rel-tag" onClick={() => setSelectedClassId(rel.sourceId)}>
-                              {getClassById(rel.sourceId)?.displayName || rel.sourceId}
+                            <span className="rel-col">
+                              <span className="rel-tag" onClick={() => setSelectedClassId(rel.targetId)}>
+                                {getClassById(rel.targetId)?.displayName || rel.targetId}
+                              </span>
                             </span>
-                          </span>
-                          <span className="rel-col">
-                            <span className="obj-prop-tag">{getPropertyById(rel.propertyId)?.displayName || rel.propertyId}</span>
-                          </span>
-                          <span className="rel-col">{selectedClass.displayName || selectedClass.name}</span>
-                        </div>
-                      ))}
+                          </div>
+                        )
+                      })}
+                      {incomingRelations.map((rel) => {
+                        const prop = getPropertyById(rel.propertyId)
+                        return (
+                          <div key={rel.id} className="rel-item">
+                            <span className="rel-col">
+                              <span className="rel-tag" onClick={() => setSelectedClassId(rel.sourceId)}>
+                                {getClassById(rel.sourceId)?.displayName || rel.sourceId}
+                              </span>
+                            </span>
+                            <span className="rel-col">
+                              <span className="obj-prop-tag" onClick={() => prop && handleLinkClick({ propertyId: rel.propertyId })}>
+                                {prop?.displayName || rel.propertyId}
+                              </span>
+                            </span>
+                            <span className="rel-col">{selectedClass.displayName || selectedClass.name}</span>
+                          </div>
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="empty-text">暂无关系</div>

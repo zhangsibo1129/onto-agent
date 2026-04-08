@@ -3,33 +3,50 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject 
 import * as d3 from "d3"
 
 // ============================================================
-// Types
+// Types (OWL 2 aligned)
 // ============================================================
 
 export interface OntologyClass {
   id: string
+  ontologyId: string
   name: string
-  displayName: string
+  displayName?: string
   description?: string
-  subClassOf?: string
+  labels: Record<string, string>
+  comments: Record<string, string>
+  equivalentTo: string[]
+  disjointWith: string[]
+  superClasses: string[]
 }
 
 export interface DataProperty {
   id: string
+  ontologyId: string
   name: string
-  displayName: string
-  domainId: string
+  displayName?: string
+  description?: string
+  labels: Record<string, string>
+  comments: Record<string, string>
+  domainIds: string[]
   rangeType: string
-  isRequired?: boolean
+  characteristics: string[]
+  superPropertyId?: string
 }
 
 export interface ObjectProperty {
   id: string
+  ontologyId: string
   name: string
-  displayName: string
-  domainId: string
-  rangeId: string
-  cardinality?: "1:1" | "1:N" | "N:1" | "N:N"
+  displayName?: string
+  description?: string
+  labels: Record<string, string>
+  comments: Record<string, string>
+  domainIds: string[]
+  rangeIds: string[]
+  characteristics: string[]
+  superPropertyId?: string
+  inverseOfId?: string
+  propertyChain: string[]
 }
 
 export interface OntologyGraphData {
@@ -96,26 +113,31 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
   const incomingByClass = new Map<string, ObjectProperty[]>()
 
   for (const dp of dataProperties) {
-    const list = dataPropsByClass.get(dp.domainId) || []
-    list.push(dp)
-    dataPropsByClass.set(dp.domainId, list)
+    for (const domainId of dp.domainIds || []) {
+      const list = dataPropsByClass.get(domainId) || []
+      list.push(dp)
+      dataPropsByClass.set(domainId, list)
+    }
   }
 
   for (const op of objectProperties) {
-    const outList = objPropsByClass.get(op.domainId) || []
-    outList.push(op)
-    objPropsByClass.set(op.domainId, outList)
-
-    const inList = incomingByClass.get(op.rangeId) || []
-    inList.push(op)
-    incomingByClass.set(op.rangeId, inList)
+    for (const domainId of op.domainIds || []) {
+      const outList = objPropsByClass.get(domainId) || []
+      outList.push(op)
+      objPropsByClass.set(domainId, outList)
+    }
+    for (const rangeId of op.rangeIds || []) {
+      const inList = incomingByClass.get(rangeId) || []
+      inList.push(op)
+      incomingByClass.set(rangeId, inList)
+    }
   }
 
   const nodes: GraphNode[] = classes.map((cls) => ({
     id: cls.id,
     name: cls.name,
     displayName: cls.displayName || cls.name,
-    subClassOf: cls.subClassOf,
+    subClassOf: cls.superClasses?.[0],
     dataProperties: dataPropsByClass.get(cls.id) || [],
     objectProperties: objPropsByClass.get(cls.id) || [],
     incomingRelations: incomingByClass.get(cls.id) || [],
@@ -126,42 +148,49 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
   const links: GraphLink[] = []
 
   for (const op of objectProperties) {
-    const reverseOp = objectProperties.find(p => p.domainId === op.rangeId && p.rangeId === op.domainId)
-    if (reverseOp && op.id < reverseOp.id) continue
+    for (const sourceId of op.domainIds || []) {
+      for (const targetId of op.rangeIds || []) {
+        const reverseOp = objectProperties.find(p => 
+          (p.domainIds || []).includes(targetId) && (p.rangeIds || []).includes(sourceId)
+        )
+        
+        if (reverseOp && op.id < reverseOp.id) continue
 
-    if (reverseOp) {
-      links.push({
-        source: op.domainId,
-        target: op.rangeId,
-        propertyId: `${op.id}|${reverseOp.id}`,
-        displayName: `${op.displayName}|${reverseOp.displayName}`,
-        type: "bidirectional",
-        sourceClass: op.domainId,
-        targetClass: op.rangeId,
-      })
-    } else {
-      links.push({
-        source: op.domainId,
-        target: op.rangeId,
-        propertyId: op.id,
-        displayName: op.displayName,
-        type: "object",
-        sourceClass: op.domainId,
-        targetClass: op.rangeId,
-      })
+        if (reverseOp) {
+          links.push({
+            source: sourceId,
+            target: targetId,
+            propertyId: `${op.id}|${reverseOp.id}`,
+            displayName: `${op.displayName || op.name}|${reverseOp.displayName || reverseOp.name}`,
+            type: "bidirectional",
+            sourceClass: sourceId,
+            targetClass: targetId,
+          })
+        } else {
+          links.push({
+            source: sourceId,
+            target: targetId,
+            propertyId: op.id,
+            displayName: op.displayName || op.name,
+            type: "object",
+            sourceClass: sourceId,
+            targetClass: targetId,
+          })
+        }
+      }
     }
   }
 
   for (const cls of classes) {
-    if (cls.subClassOf) {
+    if (cls.superClasses?.[0]) {
       links.push({
         source: cls.id,
-        target: cls.subClassOf,
+        target: cls.superClasses[0],
         propertyId: `inherit-${cls.id}`,
         displayName: "rdfs:subClassOf",
         type: "inheritance",
         sourceClass: cls.id,
-        targetClass: cls.subClassOf,
+        targetClass: cls.superClasses[0],
       })
     }
   }

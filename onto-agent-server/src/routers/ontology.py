@@ -1,16 +1,20 @@
+from typing import Any
 from fastapi import APIRouter, HTTPException
 from src.schemas.ontology import (
     OntologyClassCreate,
     DataPropertyCreate,
     ObjectPropertyCreate,
-    OntologyRelationCreate,
+    AnnotationPropertyCreate,
+    IndividualCreate,
+    AxiomCreate,
+    DataRangeBase,
 )
 from src.services import ontology as ontology_service
 
 router = APIRouter(prefix="/ontologies", tags=["ontologies"])
 
 
-def success_response(data):
+def success_response(data: Any):
     return {"success": True, "data": data}
 
 
@@ -36,6 +40,9 @@ async def get_ontology_detail(ontology_id: str):
     return success_response(detail.model_dump())
 
 
+# ==================== Classes ====================
+
+
 @router.get("/{ontology_id}/classes")
 async def get_classes(ontology_id: str):
     classes = await ontology_service.get_ontology_classes(ontology_id)
@@ -49,8 +56,16 @@ async def create_class(ontology_id: str, data: OntologyClassCreate):
         name=data.name,
         display_name=data.display_name,
         description=data.description,
+        labels=data.labels,
+        comments=data.comments,
+        equivalent_to=data.equivalent_to,
+        disjoint_with=data.disjoint_with,
+        super_classes=data.super_classes,
     )
     return success_response(new_class.model_dump())
+
+
+# ==================== Data Properties ====================
 
 
 @router.get("/{ontology_id}/data-properties")
@@ -64,11 +79,17 @@ async def create_data_property(ontology_id: str, data: DataPropertyCreate):
     new_prop = await ontology_service.create_data_property(
         ontology_id=ontology_id,
         name=data.name,
-        domain_id=data.domain_id,
+        domain_ids=data.domain_ids,
         range_type=data.range_type,
         display_name=data.display_name,
+        description=data.description,
+        characteristics=data.characteristics,
+        super_property_id=data.super_property_id,
     )
     return success_response(new_prop.model_dump())
+
+
+# ==================== Object Properties ====================
 
 
 @router.get("/{ontology_id}/object-properties")
@@ -82,25 +103,91 @@ async def create_object_property(ontology_id: str, data: ObjectPropertyCreate):
     new_prop = await ontology_service.create_object_property(
         ontology_id=ontology_id,
         name=data.name,
-        domain_id=data.domain_id,
-        range_id=data.range_id,
+        domain_ids=data.domain_ids,
+        range_ids=data.range_ids,
         display_name=data.display_name,
+        description=data.description,
+        characteristics=data.characteristics,
+        super_property_id=data.super_property_id,
+        inverse_of_id=data.inverse_of_id,
+        property_chain=data.property_chain,
     )
     return success_response(new_prop.model_dump())
 
 
-@router.get("/{ontology_id}/relations")
-async def get_relations(ontology_id: str):
-    relations = await ontology_service.get_relations(ontology_id)
-    return success_response([r.model_dump() for r in relations])
+# ==================== Annotation Properties ====================
 
 
-@router.post("/{ontology_id}/relations")
-async def create_relation(ontology_id: str, data: OntologyRelationCreate):
-    new_rel = await ontology_service.create_relation(
+@router.get("/{ontology_id}/annotation-properties")
+async def get_annotation_properties(ontology_id: str):
+    props = await ontology_service.get_annotation_properties(ontology_id)
+    return success_response([p.model_dump() for p in props])
+
+
+@router.post("/{ontology_id}/annotation-properties")
+async def create_annotation_property(ontology_id: str, data: AnnotationPropertyCreate):
+    new_prop = await ontology_service.create_annotation_property(
         ontology_id=ontology_id,
-        source_id=data.source_id,
-        target_id=data.target_id,
-        property_id=data.property_id,
+        name=data.name,
+        display_name=data.display_name,
+        description=data.description,
+        domain_ids=data.domain_ids,
+        range_ids=data.range_ids,
+        sub_property_of_id=data.sub_property_of_id,
     )
-    return success_response(new_rel.model_dump())
+    return success_response(new_prop.model_dump())
+
+
+# ==================== Individuals ====================
+
+
+@router.get("/{ontology_id}/individuals")
+async def get_individuals(ontology_id: str):
+    individuals = await ontology_service.get_individuals(ontology_id)
+    return success_response([i.model_dump() for i in individuals])
+
+
+@router.post("/{ontology_id}/individuals")
+async def create_individual(ontology_id: str, data: IndividualCreate):
+    new_ind = await ontology_service.create_individual(
+        ontology_id=ontology_id,
+        name=data.name,
+        display_name=data.display_name,
+        description=data.description,
+        types=data.types,
+        labels=data.labels,
+        comments=data.comments,
+        data_property_assertions=data.data_property_assertions,
+        object_property_assertions=data.object_property_assertions,
+    )
+    return success_response(new_ind.model_dump())
+
+
+# ==================== Axioms ====================
+
+
+@router.get("/{ontology_id}/axioms")
+async def get_axioms(ontology_id: str):
+    axioms = await ontology_service.get_axioms(ontology_id)
+    return success_response([a.model_dump() for a in axioms])
+
+
+@router.post("/{ontology_id}/axioms")
+async def create_axiom(ontology_id: str, data: AxiomCreate):
+    new_axiom = await ontology_service.create_axiom(
+        ontology_id=ontology_id,
+        axiom_type=data.type,
+        subject=data.subject,
+        assertions=data.assertions,
+        annotations=data.annotations,
+    )
+    return success_response(new_axiom.model_dump())
+
+
+# ==================== Data Ranges ====================
+
+
+@router.get("/{ontology_id}/data-ranges")
+async def get_data_ranges(ontology_id: str):
+    data_ranges = await ontology_service.get_data_ranges(ontology_id)
+    return success_response([d.model_dump() for d in data_ranges])

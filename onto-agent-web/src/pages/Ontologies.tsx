@@ -4,11 +4,21 @@ import { ontologyApi, type Ontology } from "@/services/ontologyApi"
 import "./Ontologies.css"
 
 const colorMap: Record<number, { bg: string; color: string }> = {
+  0: { bg: "rgba(59, 130, 246, 0.1)", color: "var(--brand-primary)" },
   1: { bg: "rgba(59, 130, 246, 0.1)", color: "var(--brand-primary)" },
   2: { bg: "rgba(139, 92, 246, 0.1)", color: "var(--brand-secondary)" },
   3: { bg: "rgba(6, 182, 212, 0.1)", color: "var(--brand-accent)" },
   4: { bg: "rgba(16, 185, 129, 0.1)", color: "var(--status-success)" },
   5: { bg: "rgba(245, 158, 11, 0.1)", color: "var(--status-warning)" },
+}
+
+const getColorIndex = (id: string): number => {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash) % 5 + 1
 }
 
 const statusBadgeClass: Record<string, string> = {
@@ -93,13 +103,13 @@ export default function Ontologies() {
           >
             <div className="ontology-card-header">
               <div className="ontology-card-title">
-                <div
-                  className="ontology-card-icon"
-                  style={{
-                    background: colorMap[ontology.colorIndex]?.bg,
-                    color: colorMap[ontology.colorIndex]?.color,
-                  }}
-                >
+            <div
+              className="ontology-card-icon"
+              style={{
+                background: colorMap[getColorIndex(ontology.id)]?.bg,
+                color: colorMap[getColorIndex(ontology.id)]?.color,
+              }}
+            >
                   {ontology.name.charAt(0)}
                 </div>
                 <div>
@@ -121,11 +131,11 @@ export default function Ontologies() {
               {ontology.description || "暂无描述"}
             </div>
             <div className="ontology-card-meta">
-              <span>对象: {ontology.objectCount}</span>
+              <span>类: {ontology.objectCount}</span>
               <span>·</span>
-              <span>属性: {ontology.propertyCount}</span>
+              <span>数据属性: {ontology.dataPropertyCount}</span>
               <span>·</span>
-              <span>关系: {ontology.relationCount}</span>
+              <span>对象属性: {ontology.objectPropertyCount}</span>
             </div>
           </div>
         ))}

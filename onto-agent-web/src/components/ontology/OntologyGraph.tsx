@@ -181,12 +181,12 @@ interface NodeDims {
 }
 
 function getNodeDims(node: GraphNode, globalScale: number): NodeDims {
-  const baseWidth = Math.max(140, node.displayName.length * 9 + 80)
-  const headerH = 36
-  const propLineH = 18
+  const baseWidth = Math.max(80, node.displayName.length * 5 + 40)
+  const headerH = 20
+  const propLineH = 10
   const maxVisibleProps = 5
   const visibleCount = Math.min(maxVisibleProps, node.dataProperties?.length || 0)
-  const baseHeight = headerH + visibleCount * propLineH + 16
+  const baseHeight = headerH + visibleCount * propLineH + 8
 
   return {
     w: baseWidth * globalScale,
@@ -288,8 +288,8 @@ function renderNode(
   const isHighlighted = isSelected || isHovered
 
   const { w, h, hw, hh } = getNodeDims(node, globalScale)
-  const headerH = 36 * globalScale
-  const propLineH = 18 * globalScale
+  const headerH = 14 * globalScale
+  const propLineH = 10 * globalScale
   const maxVisibleProps = 5
   const visibleDataProps = (node.dataProperties || []).slice(0, maxVisibleProps)
 
@@ -307,7 +307,7 @@ function renderNode(
   }
 
   ctx.beginPath()
-  roundRect(ctx, px - hw, py - hh, w, h, 8 * globalScale)
+  roundRect(ctx, px - hw, py - hh, w, h, 4 * globalScale)
   ctx.fillStyle = COLORS.nodeBg
   ctx.fill()
 
@@ -318,7 +318,7 @@ function renderNode(
   ctx.shadowBlur = 0
 
   ctx.beginPath()
-  roundRectTop(ctx, px - hw, py - hh, w, headerH, 8 * globalScale)
+  roundRectTop(ctx, px - hw, py - hh, w, headerH, 4 * globalScale)
   ctx.fillStyle = isSelected
     ? "rgba(99, 102, 241, 0.3)"
     : isHovered
@@ -327,13 +327,13 @@ function renderNode(
   ctx.fill()
 
   ctx.beginPath()
-  ctx.moveTo(px - hw + 8 * globalScale, py - hh + headerH)
-  ctx.lineTo(px + hw - 8 * globalScale, py - hh + headerH)
+  ctx.moveTo(px - hw + 4 * globalScale, py - hh + headerH)
+  ctx.lineTo(px + hw - 4 * globalScale, py - hh + headerH)
   ctx.strokeStyle = COLORS.nodeBorder
   ctx.lineWidth = 1 * globalScale
   ctx.stroke()
 
-  const fontSize = Math.max(11, 13 * globalScale)
+  const fontSize = Math.max(6, 7 * globalScale)
   ctx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`
   ctx.fillStyle = COLORS.text
   ctx.textAlign = "center"
@@ -344,22 +344,22 @@ function renderNode(
     py - hh + headerH / 2
   )
 
-  let propY = py - hh + headerH + 10 * globalScale
+  let propY = py - hh + headerH + 6 * globalScale
 
   for (const dp of visibleDataProps) {
-    const propFontSize = Math.max(9, 11 * globalScale)
+    const propFontSize = Math.max(5, 6 * globalScale)
     ctx.font = `${propFontSize}px Inter, -apple-system, sans-serif`
     ctx.fillStyle = COLORS.dataProp
     ctx.textAlign = "left"
     ctx.textBaseline = "top"
     ctx.beginPath()
-    ctx.arc(px - hw + 10 * globalScale, propY + propFontSize / 2 - 1, 3 * globalScale, 0, Math.PI * 2)
+    ctx.arc(px - hw + 6 * globalScale, propY + propFontSize / 2 - 1, 2 * globalScale, 0, Math.PI * 2)
     ctx.fill()
     const text = `${dp.displayName} (${dp.rangeType})`
     ctx.fillStyle = COLORS.textSecondary
     ctx.fillText(
       text.length > 22 ? text.slice(0, 20) + "…" : text,
-      px - hw + 20 * globalScale,
+      px - hw + 12 * globalScale,
       propY
     )
     propY += propLineH
@@ -368,7 +368,7 @@ function renderNode(
   const totalDataProps = node.dataProperties?.length || 0
   const shownProps = visibleDataProps.length
   if (totalDataProps > shownProps) {
-    const moreFontSize = Math.max(9, 10 * globalScale)
+    const moreFontSize = Math.max(5, 6 * globalScale)
     ctx.font = `400 ${moreFontSize}px Inter, sans-serif`
     ctx.fillStyle = COLORS.textMuted
     ctx.textAlign = "center"
@@ -422,7 +422,7 @@ function renderLink(
     tx, ty, thw, thh
   )
 
-  const arrowSize = 12 * globalScale
+  const arrowSize = 8 * globalScale
 
   ctx.save()
 
@@ -457,16 +457,16 @@ function renderLink(
   }
 
   if (link.type === "bidirectional") {
-    const angle = Math.atan2(dy, dx)
+    const linkAngle = Math.atan2(dy, dx)
     ctx.beginPath()
     ctx.moveTo(ex1, ey1)
     ctx.lineTo(
-      ex1 - arrowSize * Math.cos(angle - Math.PI / 7),
-      ey1 - arrowSize * Math.sin(angle - Math.PI / 7)
+      ex1 - arrowSize * Math.cos(linkAngle - Math.PI / 7),
+      ey1 - arrowSize * Math.sin(linkAngle - Math.PI / 7)
     )
     ctx.lineTo(
-      ex1 - arrowSize * Math.cos(angle + Math.PI / 7),
-      ey1 - arrowSize * Math.sin(angle + Math.PI / 7)
+      ex1 - arrowSize * Math.cos(linkAngle + Math.PI / 7),
+      ey1 - arrowSize * Math.sin(linkAngle + Math.PI / 7)
     )
     ctx.closePath()
     ctx.fillStyle = linkColor
@@ -475,32 +475,45 @@ function renderLink(
     ctx.beginPath()
     ctx.moveTo(ex2, ey2)
     ctx.lineTo(
-      ex2 + arrowSize * Math.cos(angle - Math.PI / 7),
-      ey2 + arrowSize * Math.sin(angle - Math.PI / 7)
+      ex2 + arrowSize * Math.cos(linkAngle - Math.PI / 7),
+      ey2 + arrowSize * Math.sin(linkAngle - Math.PI / 7)
     )
     ctx.lineTo(
-      ex2 + arrowSize * Math.cos(angle + Math.PI / 7),
-      ey2 + arrowSize * Math.sin(angle + Math.PI / 7)
+      ex2 + arrowSize * Math.cos(linkAngle + Math.PI / 7),
+      ey2 + arrowSize * Math.sin(linkAngle + Math.PI / 7)
     )
     ctx.closePath()
     ctx.fillStyle = linkColor
     ctx.fill()
 
-    const fontSize = Math.max(9, 10 * globalScale)
+    const fontSize = Math.max(5, 6 * globalScale)
     ctx.font = `400 ${fontSize}px Inter, sans-serif`
     const labels = link.displayName.split("|")
 
+    const mx = (ex1 + ex2) / 2
+    const my = (ey1 + ey2) / 2
+    const linkLen = Math.sqrt((ex2 - ex1) ** 2 + (ey2 - ey1) ** 2)
+    const labelGap = Math.min(20 * globalScale, linkLen / 4)
+
+    ctx.save()
+    ctx.translate(mx - nx * labelGap, my - ny * labelGap)
     ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
+    ctx.fillText(labels[0], 0, 0)
+    ctx.restore()
 
-    const labelOffset = 30 * globalScale
-    ctx.fillText(labels[0], ex1 - nx * labelOffset, ey1 - ny * labelOffset)
-    ctx.fillText(labels[1], ex2 + nx * labelOffset, ey2 + ny * labelOffset)
+    ctx.save()
+    ctx.translate(mx + nx * labelGap, my + ny * labelGap)
+    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(labels[1], 0, 0)
+    ctx.restore()
   }
 
   if (link.type === "inheritance") {
-    const propLen = 14 * globalScale
+    const propLen = 8 * globalScale
     const px2 = tx - nx * (thh + propLen)
     const py2 = ty - ny * (thh + propLen)
     const perpX = -ny
@@ -517,7 +530,7 @@ function renderLink(
   if (link.type !== "bidirectional") {
     const mx = (ex1 + ex2) / 2
     const my = (ey1 + ey2) / 2
-    const fontSize = Math.max(9, 10 * globalScale)
+    const fontSize = Math.max(5, 6 * globalScale)
     ctx.font = `400 ${fontSize}px Inter, sans-serif`
     const label = link.type === "inheritance" ? "⊆" : link.displayName
 
@@ -558,7 +571,7 @@ export default function OntologyGraph({
 
   useEffect(() => {
     if (graphRef.current) {
-      setTimeout(() => graphRef.current?.zoomToFit(0, 30), 100)
+      setTimeout(() => graphRef.current?.zoomToFit(0, 100), 100)
     }
   }, [data])
 
@@ -569,11 +582,11 @@ export default function OntologyGraph({
     graphRef.current.d3Force("center", d3.forceCenter(0, 0).strength(0.05))
     graphRef.current.d3Force("collision", d3.forceCollide().strength(0.8).radius((node: any) => {
       const n = node as GraphNode
-      const w = Math.max(140, n.displayName.length * 9 + 80)
-      const headerH = 36
-      const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
-      const h = headerH + propH + 16
-      return Math.sqrt(w * w + h * h) / 2
+      const w = Math.max(80, n.displayName.length * 5 + 40)
+      const headerH = 20
+      const propH = Math.min(5, n.dataProperties?.length || 0) * 10 + 8
+      const h = headerH + propH + 8
+      return Math.max(w, h) * 0.6
     }))
     graphRef.current.d3ReheatSimulation()
   }, [])
@@ -582,11 +595,11 @@ export default function OntologyGraph({
     if (!graphRef.current) return
     graphRef.current.d3Force("collision", d3.forceCollide().strength(0.8).radius((node: any) => {
       const n = node as GraphNode
-      const w = Math.max(140, n.displayName.length * 9 + 80)
-      const headerH = 36
-      const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
-      const h = headerH + propH + 16
-      return Math.sqrt(w * w + h * h) / 2 * zoomLevel
+      const w = Math.max(80, n.displayName.length * 5 + 40)
+      const headerH = 20
+      const propH = Math.min(5, n.dataProperties?.length || 0) * 10 + 8
+      const h = headerH + propH + 8
+      return Math.max(w, h) * 0.6 * zoomLevel
     }))
     graphRef.current.d3ReheatSimulation()
   }, [zoomLevel])
@@ -616,7 +629,7 @@ export default function OntologyGraph({
       const { w, h, hw, hh } = getNodeDims(node as GraphNode, globalScale)
       ctx.fillStyle = color
       ctx.beginPath()
-      roundRect(ctx, (node.x || 0) - hw, (node.y || 0) - hh, w, h, 8 * globalScale)
+      roundRect(ctx, (node.x || 0) - hw, (node.y || 0) - hh, w, h, 4 * globalScale)
       ctx.fill()
     },
     []

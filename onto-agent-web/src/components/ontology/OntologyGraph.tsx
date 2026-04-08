@@ -470,18 +470,19 @@ function renderLink(
     ctx.stroke()
     ctx.setLineDash([])
 
-    const arrowLen = arrowSize * 1.2
     ctx.beginPath()
     ctx.moveTo(ex1, ey1)
     ctx.lineTo(
-      ex1 - arrowLen * Math.cos(angle - Math.PI / 6),
-      ey1 - arrowLen * Math.sin(angle - Math.PI / 6)
+      ex1 - arrowSize * Math.cos(angle - Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle - Math.PI / 7)
     )
     ctx.lineTo(
-      ex1 - arrowLen * Math.cos(angle + Math.PI / 6),
-      ey1 - arrowLen * Math.sin(angle + Math.PI / 6)
+      ex1 - arrowSize * Math.cos(angle + Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle + Math.PI / 7)
     )
     ctx.closePath()
+    ctx.fillStyle = COLORS.panelBg
+    ctx.fill()
     ctx.strokeStyle = linkColor
     ctx.lineWidth = linkWidth
     ctx.stroke()
@@ -787,108 +788,51 @@ export default function OntologyGraph({
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        minZoom={0.4}
-        maxZoom={2}
+        minZoom={0.25}
+        maxZoom={1.5}
       />
 
-      {/* Controls */}
+      {/* Zoom Slider */}
       <div
         style={{
           position: "absolute",
           bottom: 16,
           right: 16,
           display: "flex",
-          flexDirection: "column",
+          alignItems: "center",
           gap: 8,
+          background: COLORS.panelBg,
+          border: `1px solid ${COLORS.panelBorder}`,
+          borderRadius: 8,
+          padding: "8px 12px",
+          backdropFilter: "blur(12px)",
         }}
       >
-        <button
-          onClick={() => graphRef.current?.zoomToFit(600, 30)}
-          title="Fit to view"
+        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>0.25x</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round((zoomLevel - 0.25) / 1.25 * 100)}
+          onChange={(e) => {
+            const value = parseInt(e.target.value) / 100
+            const targetZoom = 0.25 + value * 1.25
+            const snappedZoom = Math.abs(targetZoom - 1) < 0.1 ? 1 : targetZoom
+            if (graphRef.current) {
+              graphRef.current.zoom(snappedZoom, 200)
+            }
+          }}
           style={{
-            width: 36,
-            height: 36,
-            background: COLORS.panelBg,
-            border: `1px solid ${COLORS.panelBorder}`,
-            borderRadius: 8,
-            color: COLORS.textSecondary,
+            width: 80,
+            height: 4,
+            appearance: "none",
+            background: COLORS.panelBorder,
+            borderRadius: 2,
+            outline: "none",
             cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            backdropFilter: "blur(12px)",
-            transition: "all 0.15s",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)"
-            e.currentTarget.style.color = COLORS.text
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = COLORS.panelBg
-            e.currentTarget.style.color = COLORS.textSecondary
-          }}
-        >
-          ⊡
-        </button>
-        <button
-          onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 1.3, 300)}
-          title="Zoom in"
-          style={{
-            width: 36,
-            height: 36,
-            background: COLORS.panelBg,
-            border: `1px solid ${COLORS.panelBorder}`,
-            borderRadius: 8,
-            color: COLORS.textSecondary,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            backdropFilter: "blur(12px)",
-            transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)"
-            e.currentTarget.style.color = COLORS.text
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = COLORS.panelBg
-            e.currentTarget.style.color = COLORS.textSecondary
-          }}
-        >
-          +
-        </button>
-        <button
-          onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 0.7, 300)}
-          title="Zoom out"
-          style={{
-            width: 36,
-            height: 36,
-            background: COLORS.panelBg,
-            border: `1px solid ${COLORS.panelBorder}`,
-            borderRadius: 8,
-            color: COLORS.textSecondary,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            backdropFilter: "blur(12px)",
-            transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(59, 130, 246, 0.2)"
-            e.currentTarget.style.color = COLORS.text
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = COLORS.panelBg
-            e.currentTarget.style.color = COLORS.textSecondary
-          }}
-        >
-          −
-        </button>
+        />
+        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>1.5x</span>
       </div>
     </div>
   )

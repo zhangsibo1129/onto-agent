@@ -267,22 +267,22 @@
 }
 
 .panel-section {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  padding-bottom: 4px;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding-bottom: 3px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .section-title {
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: #64748B;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex: 1;
@@ -290,67 +290,67 @@
 
 .section-count {
   font-size: 9px;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 5px;
-  border-radius: 4px;
+  font-weight: 500;
+  color: #475569;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 /* Info List */
 .info-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .info-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .info-key {
   flex-shrink: 0;
-  width: 90px;
-  color: var(--text-muted);
-  font-size: 10px;
+  width: 85px;
+  color: #475569;
+  font-size: 9px;
 }
 
 .info-val {
   flex: 1;
-  color: var(--text-secondary);
+  color: #94A3B8;
 }
 
 .info-val.mono {
   font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 10px;
-  color: var(--text-primary);
+  font-size: 9px;
+  color: #CBD5E1;
 }
 
 .info-val.desc {
-  color: var(--text-secondary);
+  color: #64748B;
   line-height: 1.4;
 }
 
 .info-val.links {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
 }
 
 .link-tag {
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
+  padding: 1px 5px;
   background: rgba(99, 102, 241, 0.15);
   color: #818CF8;
   border-radius: 3px;
-  font-size: 10px;
+  font-size: 9px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.1s;
 }
 
 .link-tag:hover {
@@ -358,8 +358,8 @@
 }
 
 .link-tag.sm {
-  padding: 1px 4px;
-  font-size: 9px;
+  padding: 1px 3px;
+  font-size: 8px;
 }
 
 .link-tag.disjoint {
@@ -378,40 +378,38 @@
 
 .prop-table-header {
   display: grid;
-  grid-template-columns: 1fr 70px 60px auto;
-  gap: 6px;
-  padding: 3px 6px;
-  color: var(--text-muted);
+  grid-template-columns: 1fr 60px 50px auto;
+  padding: 2px 4px;
+  color: #64748B;
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .prop-table-row {
   display: grid;
-  grid-template-columns: 1fr 70px 60px auto;
-  gap: 6px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: background 0.15s;
+  grid-template-columns: 1fr 60px 50px auto;
+  padding: 3px 4px;
+  border-radius: 3px;
+  transition: background 0.1s;
   align-items: center;
 }
 
 .prop-table-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .prop-name-cell {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
 .prop-display {
-  color: var(--text-primary);
+  color: #E2E8F0;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -420,8 +418,8 @@
 
 .prop-name-mono {
   font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 9px;
-  color: var(--text-muted);
+  font-size: 8px;
+  color: #475569;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -435,8 +433,8 @@
 }
 
 .prop-type-cell {
-  color: #10B981;
-  font-size: 10px;
+  color: #34D399;
+  font-size: 9px;
 }
 
 .prop-char-cell {
@@ -447,20 +445,20 @@
 
 .char-badge {
   display: inline-block;
-  padding: 1px 4px;
-  background: rgba(99, 102, 241, 0.1);
-  color: #818CF8;
-  border-radius: 3px;
-  font-size: 9px;
+  padding: 1px 3px;
+  background: rgba(99, 102, 241, 0.15);
+  color: #A5B4FC;
+  border-radius: 2px;
+  font-size: 8px;
 }
 
 .inverse-tag {
   display: inline-block;
-  padding: 1px 4px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
-  border-radius: 3px;
-  font-size: 9px;
+  padding: 1px 3px;
+  background: rgba(251, 191, 36, 0.15);
+  color: #FCD34D;
+  border-radius: 2px;
+  font-size: 8px;
   cursor: help;
 }
 
@@ -468,17 +466,17 @@
 .relation-list-compact {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .rel-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
   font-size: 10px;
-  transition: background 0.15s;
+  transition: background 0.1s;
 }
 
 .rel-row:hover {
@@ -489,23 +487,23 @@
 .rel-target {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .rel-arrow {
-  color: #818CF8;
-  font-size: 11px;
+  color: #6366F1;
+  font-size: 10px;
 }
 
 .rel-prop {
-  color: var(--text-secondary);
+  color: #64748B;
 }
 
 .panel-footer-actions {
   display: flex;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   margin-top: 4px;
 }
 

@@ -585,7 +585,7 @@ export default function OntologyGraph({
   useEffect(() => {
     if (!graphRef.current) return
     graphRef.current.d3Force("charge", d3.forceManyBody().strength(-400).distanceMax(400))
-    graphRef.current.d3Force("link", d3.forceLink().strength(0.05))
+    graphRef.current.d3Force("link", d3.forceLink().strength(0))
     graphRef.current.d3Force("center", d3.forceCenter(0, 0).strength(0.05))
     graphRef.current.d3Force("collision", d3.forceCollide().strength(0.8).radius((node: any) => {
       const n = node as GraphNode

@@ -485,6 +485,14 @@ function renderLink(
     ctx.strokeStyle = linkColor
     ctx.lineWidth = linkWidth
     ctx.stroke()
+
+    const mx = (ex1 + ex2) / 2
+    const my = (ey1 + ey2) / 2
+    ctx.font = `400 ${Math.max(5, 6 * globalScale)}px Inter, sans-serif`
+    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText("subClassOf", mx, my)
   } else if (link.type === "object") {
     const angle = Math.atan2(dy, dx)
     ctx.beginPath()

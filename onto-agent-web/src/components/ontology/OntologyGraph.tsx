@@ -788,8 +788,8 @@ export default function OntologyGraph({
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        minZoom={0.5}
-        maxZoom={1.5}
+        minZoom={0.75}
+        maxZoom={2}
       />
     </div>
   )

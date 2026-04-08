@@ -1,59 +1,9 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { OntologyGraph } from "@/components/ontology"
-import type { OntologyClass, DataProperty, ObjectProperty, OntologyGraphData } from "@/components/ontology"
-import { mockOntologies } from "@/data/mock"
+import type { OntologyGraphData } from "@/components/ontology"
+import { ontologyApi, type Ontology, type OntologyClass, type DataProperty, type ObjectProperty, type OntologyRelation } from "@/services/ontologyApi"
 import "./OntologyModeling.css"
-
-// ============================================================
-// Types (local aliases for the page)
-// ============================================================
-
-interface OntologyRelation {
-  id: string
-  sourceId: string
-  targetId: string
-  propertyId: string
-}
-
-// ============================================================
-// Mock data — in production this comes from the API
-// ============================================================
-
-const MOCK_CLASSES: OntologyClass[] = [
-  { id: "Product", name: "Product", displayName: "产品", description: "商品实体" },
-  { id: "Order", name: "Order", displayName: "订单", description: "订单实体" },
-  { id: "Customer", name: "Customer", displayName: "客户", description: "客户实体" },
-  { id: "Supplier", name: "Supplier", displayName: "供应商", description: "供应商实体" },
-  { id: "Shipment", name: "Shipment", displayName: "货运", description: "货运实体" },
-]
-
-const MOCK_DATA_PROPERTIES: DataProperty[] = [
-  { id: "p1", name: "productName", displayName: "产品名称", domainId: "Product", rangeType: "String" },
-  { id: "p2", name: "price", displayName: "价格", domainId: "Product", rangeType: "Float" },
-  { id: "p3", name: "orderDate", displayName: "订单日期", domainId: "Order", rangeType: "Date" },
-  { id: "p4", name: "totalAmount", displayName: "总金额", domainId: "Order", rangeType: "Float" },
-  { id: "p5", name: "customerName", displayName: "客户名称", domainId: "Customer", rangeType: "String" },
-  { id: "p6", name: "tier", displayName: "客户等级", domainId: "Customer", rangeType: "Enum" },
-  { id: "p7", name: "supplierName", displayName: "供应商名称", domainId: "Supplier", rangeType: "String" },
-  { id: "p8", name: "shipmentDate", displayName: "发货日期", domainId: "Shipment", rangeType: "Date" },
-]
-
-const MOCK_OBJECT_PROPERTIES: ObjectProperty[] = [
-  { id: "op1", name: "hasProduct", displayName: "包含产品", domainId: "Order", rangeId: "Product" },
-  { id: "op2", name: "placedBy", displayName: "下单", domainId: "Order", rangeId: "Customer" },
-  { id: "op3", name: "suppliedBy", displayName: "供应方", domainId: "Product", rangeId: "Supplier" },
-  { id: "op4", name: "ships", displayName: "发货运", domainId: "Order", rangeId: "Shipment" },
-  { id: "op5", name: "owns", displayName: "拥有", domainId: "Customer", rangeId: "Order" },
-]
-
-const MOCK_RELATIONS: OntologyRelation[] = [
-  { id: "r1", sourceId: "Order", targetId: "Product", propertyId: "op1" },
-  { id: "r2", sourceId: "Order", targetId: "Customer", propertyId: "op2" },
-  { id: "r3", sourceId: "Product", targetId: "Supplier", propertyId: "op3" },
-  { id: "r4", sourceId: "Order", targetId: "Shipment", propertyId: "op4" },
-  { id: "r5", sourceId: "Customer", targetId: "Order", propertyId: "op5" },
-]
 
 // ============================================================
 // Main Component
@@ -63,52 +13,72 @@ export default function OntologyModeling() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const ontology = mockOntologies.find((o) => o.id === id)
-
-  // ---- State ----
-  const [classes, setClasses] = useState<OntologyClass[]>(MOCK_CLASSES)
-  const [dataProperties, setDataProperties] = useState<DataProperty[]>(MOCK_DATA_PROPERTIES)
-  const [objectProperties, setObjectProperties] = useState<ObjectProperty[]>(MOCK_OBJECT_PROPERTIES)
-  const [relations] = useState<OntologyRelation[]>(MOCK_RELATIONS)
-
+  const [ontology, setOntology] = useState<Ontology | null>(null)
+  const [classes, setClasses] = useState<OntologyClass[]>([])
+  const [dataProperties, setDataProperties] = useState<DataProperty[]>([])
+  const [objectProperties, setObjectProperties] = useState<ObjectProperty[]>([])
+  const [relations, setRelations] = useState<OntologyRelation[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "property" | "relation" | null>(null)
 
-  // ---- Handlers (hooks must be before conditionals) ----
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    ontologyApi.getDetail(id)
+      .then((data) => {
+        setOntology(data)
+        setClasses(data.classes)
+        setDataProperties(data.dataProperties)
+        setObjectProperties(data.objectProperties)
+        setRelations(data.relations)
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [id])
+
   const handleClassSelect = useCallback((classId: string | null) => {
     setSelectedClassId(classId)
   }, [])
 
-  const handleAddClass = useCallback((name: string, displayName: string) => {
-    setClasses(prev => [...prev, { id: name, name, displayName }])
+  const handleCreateClass = useCallback(async (name: string, displayName: string) => {
+    if (!id) return
+    const newClass = await ontologyApi.createClass(id, { name, displayName })
+    setClasses(prev => [...prev, newClass])
     setShowAddModal(null)
-  }, [])
+  }, [id])
 
-  const handleAddDataProperty = useCallback((
+  const handleCreateDataProperty = useCallback(async (
     name: string,
     displayName: string,
     domainId: string,
     rangeType: string
   ) => {
-    setDataProperties(prev => [
-      ...prev,
-      { id: `dp-${Date.now()}`, name, displayName, domainId, rangeType },
-    ])
+    if (!id) return
+    const newProp = await ontologyApi.createDataProperty(id, { name, displayName, domainId, rangeType })
+    setDataProperties(prev => [...prev, newProp])
     setShowAddModal(null)
-  }, [])
+  }, [id])
 
-  const handleAddObjectProperty = useCallback((
+  const handleCreateObjectProperty = useCallback(async (
     name: string,
     displayName: string,
     domainId: string,
     rangeId: string
   ) => {
-    setObjectProperties(prev => [
-      ...prev,
-      { id: `op-${Date.now()}`, name, displayName, domainId, rangeId },
-    ])
+    if (!id) return
+    const newProp = await ontologyApi.createObjectProperty(id, { name, displayName, domainId, rangeId })
+    setObjectProperties(prev => [...prev, newProp])
     setShowAddModal(null)
-  }, [])
+  }, [id])
+
+  if (loading) {
+    return (
+      <div style={{ padding: 24, color: "#F1F5F9" }}>
+        加载中...
+      </div>
+    )
+  }
 
   if (!ontology) {
     return (
@@ -458,7 +428,7 @@ export default function OntologyModeling() {
                     const nameInput = document.getElementById("className") as HTMLInputElement
                     const displayInput = document.getElementById("classDisplayName") as HTMLInputElement
                     if (nameInput.value) {
-                      handleAddClass(
+                      handleCreateClass(
                         nameInput.value,
                         displayInput.value || nameInput.value
                       )
@@ -469,7 +439,7 @@ export default function OntologyModeling() {
                     const domainSelect = document.getElementById("propDomain") as HTMLSelectElement
                     const rangeSelect = document.getElementById("propRange") as HTMLSelectElement
                     if (nameInput.value) {
-                      handleAddDataProperty(
+                      handleCreateDataProperty(
                         nameInput.value,
                         displayInput.value || nameInput.value,
                         domainSelect.value,
@@ -482,7 +452,7 @@ export default function OntologyModeling() {
                     const sourceSelect = document.getElementById("relSource") as HTMLSelectElement
                     const targetSelect = document.getElementById("relTarget") as HTMLSelectElement
                     if (nameInput.value) {
-                      handleAddObjectProperty(
+                      handleCreateObjectProperty(
                         nameInput.value,
                         displayInput.value || nameInput.value,
                         sourceSelect.value,

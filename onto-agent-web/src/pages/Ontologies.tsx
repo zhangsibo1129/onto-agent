@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { mockOntologies } from "@/data/mock"
+import { ontologyApi, type Ontology } from "@/services/ontologyApi"
 import "./Ontologies.css"
 
 const colorMap: Record<number, { bg: string; color: string }> = {
@@ -23,12 +23,19 @@ const statusText: Record<string, string> = {
 
 export default function Ontologies() {
   const navigate = useNavigate()
+  const [ontologies, setOntologies] = useState<Ontology[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("全部状态")
 
-  const publishedCount = mockOntologies.filter((o) => o.status === "published").length
+  useEffect(() => {
+    ontologyApi.list()
+      .then(setOntologies)
+      .catch(console.error)
+  }, [])
 
-  const filteredOntologies = mockOntologies.filter((o) => {
+  const publishedCount = ontologies.filter((o) => o.status === "published").length
+
+  const filteredOntologies = ontologies.filter((o) => {
     const matchesSearch = o.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus =
       statusFilter === "全部状态" ||
@@ -70,7 +77,7 @@ export default function Ontologies() {
           <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: publishedCount > 0 ? "var(--status-success)" : "var(--status-error)" }}></span>
             <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {publishedCount}/{mockOntologies.length}
+              {publishedCount}/{ontologies.length}
             </span>
           </span>
           <button className="btn btn-primary btn-sm" onClick={() => alert("创建本体功能开发中...")}>+ 添加本体</button>
@@ -93,7 +100,7 @@ export default function Ontologies() {
                     color: colorMap[ontology.colorIndex]?.color,
                   }}
                 >
-                  {ontology.initial}
+                  {ontology.name.charAt(0)}
                 </div>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>

@@ -819,8 +819,8 @@ export default function OntologyGraph({
         onNodeDragEnd={onNodeDragEnd}
         onZoom={onZoom}
         cooldownTicks={200}
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.4}
+        d3AlphaDecay={0.04}
+        d3VelocityDecay={0.6}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}

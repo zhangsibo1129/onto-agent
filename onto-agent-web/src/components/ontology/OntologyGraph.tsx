@@ -390,7 +390,8 @@ function renderLink(
   sourceNode: GraphNode,
   targetNode: GraphNode,
   globalScale: number,
-  selectedClassId: string | null
+  selectedClassId: string | null,
+  hoveredId: string | null
 ) {
   const sx = sourceNode.x || 0
   const sy = sourceNode.y || 0
@@ -401,7 +402,8 @@ function renderLink(
   const { hw: thw, hh: thh } = getNodeDims(targetNode, globalScale)
 
   const isHighlighted =
-    sourceNode.id === selectedClassId || targetNode.id === selectedClassId
+    sourceNode.id === selectedClassId || targetNode.id === selectedClassId ||
+    sourceNode.id === hoveredId || targetNode.id === hoveredId
 
   const linkColor = isHighlighted ? COLORS.objectProp : COLORS.linkDefault
   const linkWidth = isHighlighted ? 2.5 * globalScale : 1.5 * globalScale
@@ -558,7 +560,7 @@ interface OntologyGraphProps {
 
 export default function OntologyGraph({
   data,
-  selectedClassId,
+  selectedClassId: _selectedClassId,
   onClassSelect,
   width = 800,
   height = 600,
@@ -570,6 +572,7 @@ export default function OntologyGraph({
   const [dimensions, setDimensions] = useState({ width, height })
   const [zoomLevel, setZoomLevel] = useState(1)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -622,9 +625,9 @@ export default function OntologyGraph({
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      renderNode(ctx, node, globalScale, selectedClassId ?? null, hoveredId)
+      renderNode(ctx, node, globalScale, selectedId, hoveredId)
     },
-    [selectedClassId, hoveredId]
+    [selectedId, hoveredId]
   )
 
   const nodePointerAreaPaint = useCallback(
@@ -643,15 +646,17 @@ export default function OntologyGraph({
       const source = link.source as GraphNode
       const target = link.target as GraphNode
       if (!source || !target || source.x == null || target.x == null) return
-      renderLink(ctx, link, source, target, globalScale, selectedClassId ?? null)
+      renderLink(ctx, link, source, target, globalScale, selectedId, hoveredId)
     },
-    [selectedClassId]
+    [selectedId, hoveredId]
   )
 
   const onNodeClick = useCallback(
     (node: NodeObject) => {
       if (dragStartPosRef.current) return
-      onClassSelect?.((node as GraphNode).id)
+      const id = (node as GraphNode).id
+      setSelectedId(prev => prev === id ? null : id)
+      onClassSelect?.(id)
     },
     [onClassSelect]
   )
@@ -724,9 +729,9 @@ export default function OntologyGraph({
         onNodeDrag={onNodeDrag}
         onNodeDragEnd={onNodeDragEnd}
         onZoom={(transform) => setZoomLevel(transform.k)}
-        cooldownTicks={50}
-        d3AlphaDecay={0.1}
-        d3VelocityDecay={0.5}
+        cooldownTicks={200}
+        d3AlphaDecay={0.02}
+        d3VelocityDecay={0.4}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}

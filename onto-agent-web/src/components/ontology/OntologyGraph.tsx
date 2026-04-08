@@ -459,7 +459,33 @@ function renderLink(
 
   const arrowBack = arrowSize * Math.cos(Math.PI / 7)
 
-  if (link.type === "object") {
+  if (link.type === "inheritance") {
+    const angle = Math.atan2(dy, dx)
+    ctx.setLineDash([5, 3])
+    ctx.beginPath()
+    ctx.moveTo(ex2, ey2)
+    ctx.lineTo(ex1 - arrowBack * Math.cos(angle), ey1 - arrowBack * Math.sin(angle))
+    ctx.strokeStyle = linkColor
+    ctx.lineWidth = linkWidth
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    const arrowLen = arrowSize * 1.2
+    ctx.beginPath()
+    ctx.moveTo(ex1, ey1)
+    ctx.lineTo(
+      ex1 - arrowLen * Math.cos(angle - Math.PI / 6),
+      ey1 - arrowLen * Math.sin(angle - Math.PI / 6)
+    )
+    ctx.lineTo(
+      ex1 - arrowLen * Math.cos(angle + Math.PI / 6),
+      ey1 - arrowLen * Math.sin(angle + Math.PI / 6)
+    )
+    ctx.closePath()
+    ctx.strokeStyle = linkColor
+    ctx.lineWidth = linkWidth
+    ctx.stroke()
+  } else if (link.type === "object") {
     const angle = Math.atan2(dy, dx)
     ctx.beginPath()
     ctx.moveTo(ex2, ey2)
@@ -542,27 +568,12 @@ function renderLink(
     ctx.fillText(labels[1] || "", revEndX + nx * 15, revEndY + ny * 15)
   }
 
-  if (link.type === "inheritance") {
-    const propLen = 8 * globalScale
-    const px2 = tx - nx * (thh + propLen)
-    const py2 = ty - ny * (thh + propLen)
-    const perpX = -ny
-    const perpY = nx
-    ctx.beginPath()
-    ctx.moveTo(tx - nx * thh, ty - ny * thh)
-    ctx.lineTo(px2 + perpX * propLen * 0.6, py2 + perpY * propLen * 0.6)
-    ctx.lineTo(px2 - perpX * propLen * 0.6, py2 - perpY * propLen * 0.6)
-    ctx.closePath()
-    ctx.fillStyle = linkColor
-    ctx.fill()
-  }
-
-  if (link.type !== "bidirectional") {
+  if (link.type === "object") {
     const mx = (ex1 + ex2) / 2
     const my = (ey1 + ey2) / 2
     const fontSize = Math.max(5, 6 * globalScale)
     ctx.font = `400 ${fontSize}px Inter, sans-serif`
-    const label = link.type === "inheritance" ? "⊆" : link.displayName
+    const label = link.displayName
 
     ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
     ctx.textAlign = "center"

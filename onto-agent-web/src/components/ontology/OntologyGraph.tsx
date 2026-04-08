@@ -574,6 +574,7 @@ export default function OntologyGraph({
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
+  const isDraggingRef = useRef(false)
 
   useEffect(() => {
     if (graphRef.current) {
@@ -663,6 +664,7 @@ export default function OntologyGraph({
 
   const onNodeDrag = useCallback(
     (_node: NodeObject, _translate: { x: number; y: number }) => {
+      isDraggingRef.current = true
       if (!dragStartPosRef.current) {
         dragStartPosRef.current = { x: 0, y: 0 }
       }
@@ -672,6 +674,7 @@ export default function OntologyGraph({
 
   const onNodeDragEnd = useCallback(
     (_node: NodeObject) => {
+      isDraggingRef.current = false
       dragStartPosRef.current = null
     },
     []
@@ -680,8 +683,10 @@ export default function OntologyGraph({
   const onNodeHover = useCallback(
     (node: NodeObject | null) => {
       const id = node ? (node as GraphNode).id : null
-      hoveredIdRef.current = id
-      setHoveredId(id)
+      if (!isDraggingRef.current) {
+        hoveredIdRef.current = id
+        setHoveredId(id)
+      }
       if (containerRef.current) {
         containerRef.current.style.cursor = id ? "pointer" : "grab"
       }

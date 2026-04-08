@@ -88,3 +88,18 @@
   width: 32px;
   height: 32px;
 }
+
+/* Primary Outline */
+.btn-primary-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  height: 30px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.btn-primary-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+}

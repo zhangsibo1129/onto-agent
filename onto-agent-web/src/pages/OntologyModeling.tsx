@@ -44,6 +44,7 @@ const MOCK_OBJECT_PROPERTIES: ObjectProperty[] = [
   { id: "op2", name: "placedBy", displayName: "下单", domainId: "Order", rangeId: "Customer" },
   { id: "op3", name: "suppliedBy", displayName: "供应方", domainId: "Product", rangeId: "Supplier" },
   { id: "op4", name: "ships", displayName: "发货运", domainId: "Order", rangeId: "Shipment" },
+  { id: "op5", name: "owns", displayName: "拥有", domainId: "Customer", rangeId: "Order" },
 ]
 
 const MOCK_RELATIONS: OntologyRelation[] = [
@@ -51,6 +52,7 @@ const MOCK_RELATIONS: OntologyRelation[] = [
   { id: "r2", sourceId: "Order", targetId: "Customer", propertyId: "op2" },
   { id: "r3", sourceId: "Product", targetId: "Supplier", propertyId: "op3" },
   { id: "r4", sourceId: "Order", targetId: "Shipment", propertyId: "op4" },
+  { id: "r5", sourceId: "Customer", targetId: "Order", propertyId: "op5" },
 ]
 
 // ============================================================
@@ -141,62 +143,66 @@ export default function OntologyModeling() {
       <div className="ontology-toolbar">
         <div className="toolbar-left">
           <div className="ontology-stats">
-            <span className="stat-item">
-              <span className="stat-dot class"></span>
-              类: {classes.length}
-            </span>
-            <span className="stat-item">
-              <span className="stat-dot property"></span>
-              属性: {dataProperties.length + objectProperties.length}
-            </span>
-            <span className="stat-item">
-              <span className="stat-dot relation"></span>
-              关系: {relations.length}
-            </span>
-            <span className="stat-divider">|</span>
-            <span className="stat-item legend-item">
-              <svg width="12" height="12" viewBox="0 0 12 12">
-                <circle cx="6" cy="6" r="5" fill="#6366F1" />
+            <div className="stat-group">
+              <svg className="stat-icon" viewBox="0 0 20 20" width="14" height="14">
+                <rect x="2" y="4" width="16" height="12" rx="3" fill="#475569" fillOpacity="0.2" stroke="#475569" strokeWidth="1.5" />
+                <line x1="2" y1="9" x2="18" y2="9" stroke="#475569" strokeWidth="1" />
               </svg>
-              类
-            </span>
-            <span className="stat-item legend-item">
-              <svg width="16" height="12" viewBox="0 0 16 12">
-                <line x1="1" y1="6" x2="12" y2="6" stroke="#10B981" strokeWidth="2" strokeDasharray="3 2" />
-                <polygon points="10,2 16,6 10,10" fill="#10B981" />
+              <span className="stat-label">对象</span>
+              <span className="stat-value">{classes.length}</span>
+            </div>
+            <div className="stat-group">
+              <svg className="stat-icon" viewBox="0 0 16 16" width="14" height="14">
+                <circle cx="8" cy="8" r="6" fill="#10B981" fillOpacity="0.3" stroke="#10B981" strokeWidth="1.5" />
               </svg>
-              数据属性
-            </span>
-            <span className="stat-item legend-item">
-              <svg width="16" height="12" viewBox="0 0 16 12">
-                <line x1="1" y1="6" x2="12" y2="6" stroke="#F59E0B" strokeWidth="2" />
-                <polygon points="10,2 16,6 10,10" fill="#F59E0B" />
+              <span className="stat-label">属性</span>
+              <span className="stat-value">{dataProperties.length + objectProperties.length}</span>
+            </div>
+            <div className="stat-group">
+              <svg className="stat-icon" viewBox="0 0 16 16" width="14" height="14">
+                <line x1="1" y1="8" x2="10" y2="8" stroke="#64748B" strokeWidth="2" />
+                <polygon points="8,4 14,8 8,12" fill="#64748B" />
               </svg>
-              对象属性
-            </span>
-            <span className="stat-item legend-item">
-              <svg width="16" height="12" viewBox="0 0 16 12">
-                <line x1="2" y1="10" x2="8" y2="2" stroke="#EC4899" strokeWidth="2" />
-                <line x1="8" y1="2" x2="14" y2="10" stroke="#EC4899" strokeWidth="2" />
-              </svg>
-              父类
-            </span>
+              <span className="stat-label">关系</span>
+              <span className="stat-value">{relations.length}</span>
+            </div>
+          </div>
+
+          <div className="search-box">
+            <svg className="search-icon" viewBox="0 0 20 20" width="14" height="14">
+              <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+              <line x1="12" y1="12" x2="16" y2="16" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+            <input type="text" placeholder="搜索..." className="search-input" />
           </div>
         </div>
+
         <div className="toolbar-actions">
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("class")}>
-            + 类
-          </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("property")}>
-            + 属性
-          </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("relation")}>
-            + 关系
-          </button>
-          <div className="toolbar-divider"></div>
-          <button className="btn btn-secondary btn-sm">导入</button>
-          <button className="btn btn-secondary btn-sm">导出</button>
-          <button className="btn btn-primary btn-sm">保存</button>
+          <div className="toolbar-right">
+            <div className="btn-group-secondary">
+              <button className="btn-toolbar">
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <path d="M2 4h5l1 2h6v8H2V4z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                </svg>
+                导入
+              </button>
+              <button className="btn-toolbar">
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <path d="M2 10V12h12v-2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M8 2v8M5 5l3-3 3 3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                导出
+              </button>
+            </div>
+            <button className="btn-toolbar btn-toolbar-primary">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <path d="M2 10V12h12v-2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M4 10V6h4l2 2v2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 2v6" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              保存
+            </button>
+          </div>
         </div>
       </div>
 

@@ -79,7 +79,7 @@ interface GraphNode extends NodeObject {
 interface GraphLink extends LinkObject {
   propertyId: string
   displayName: string
-  type: "data" | "object" | "inheritance"
+  type: "data" | "object" | "bidirectional" | "inheritance"
   sourceClass?: string
   targetClass?: string
 }
@@ -126,15 +126,30 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
   const links: GraphLink[] = []
 
   for (const op of objectProperties) {
-    links.push({
-      source: op.domainId,
-      target: op.rangeId,
-      propertyId: op.id,
-      displayName: op.displayName,
-      type: "object",
-      sourceClass: op.domainId,
-      targetClass: op.rangeId,
-    })
+    const reverseOp = objectProperties.find(p => p.domainId === op.rangeId && p.rangeId === op.domainId)
+    if (reverseOp && op.id < reverseOp.id) continue
+
+    if (reverseOp) {
+      links.push({
+        source: op.domainId,
+        target: op.rangeId,
+        propertyId: `${op.id}|${reverseOp.id}`,
+        displayName: `${op.displayName}|${reverseOp.displayName}`,
+        type: "bidirectional",
+        sourceClass: op.domainId,
+        targetClass: op.rangeId,
+      })
+    } else {
+      links.push({
+        source: op.domainId,
+        target: op.rangeId,
+        propertyId: op.id,
+        displayName: op.displayName,
+        type: "object",
+        sourceClass: op.domainId,
+        targetClass: op.rangeId,
+      })
+    }
   }
 
   for (const cls of classes) {
@@ -441,6 +456,49 @@ function renderLink(
     ctx.fill()
   }
 
+  if (link.type === "bidirectional") {
+    const angle = Math.atan2(dy, dx)
+    ctx.beginPath()
+    ctx.moveTo(ex1, ey1)
+    ctx.lineTo(
+      ex1 - arrowSize * Math.cos(angle - Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle - Math.PI / 7)
+    )
+    ctx.lineTo(
+      ex1 - arrowSize * Math.cos(angle + Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle + Math.PI / 7)
+    )
+    ctx.closePath()
+    ctx.fillStyle = linkColor
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.moveTo(ex2, ey2)
+    ctx.lineTo(
+      ex2 + arrowSize * Math.cos(angle - Math.PI / 7),
+      ey2 + arrowSize * Math.sin(angle - Math.PI / 7)
+    )
+    ctx.lineTo(
+      ex2 + arrowSize * Math.cos(angle + Math.PI / 7),
+      ey2 + arrowSize * Math.sin(angle + Math.PI / 7)
+    )
+    ctx.closePath()
+    ctx.fillStyle = linkColor
+    ctx.fill()
+
+    const fontSize = Math.max(9, 10 * globalScale)
+    ctx.font = `400 ${fontSize}px Inter, sans-serif`
+    const labels = link.displayName.split("|")
+
+    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+
+    const labelOffset = 30 * globalScale
+    ctx.fillText(labels[0], ex1 - nx * labelOffset, ey1 - ny * labelOffset)
+    ctx.fillText(labels[1], ex2 + nx * labelOffset, ey2 + ny * labelOffset)
+  }
+
   if (link.type === "inheritance") {
     const propLen = 14 * globalScale
     const px2 = tx - nx * (thh + propLen)
@@ -456,16 +514,18 @@ function renderLink(
     ctx.fill()
   }
 
-  const mx = (ex1 + ex2) / 2
-  const my = (ey1 + ey2) / 2
-  const fontSize = Math.max(9, 10 * globalScale)
-  ctx.font = `400 ${fontSize}px Inter, sans-serif`
-  const label = link.type === "inheritance" ? "⊆" : link.displayName
+  if (link.type !== "bidirectional") {
+    const mx = (ex1 + ex2) / 2
+    const my = (ey1 + ey2) / 2
+    const fontSize = Math.max(9, 10 * globalScale)
+    ctx.font = `400 ${fontSize}px Inter, sans-serif`
+    const label = link.type === "inheritance" ? "⊆" : link.displayName
 
-  ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
-  ctx.textAlign = "center"
-  ctx.textBaseline = "middle"
-  ctx.fillText(label, mx, my)
+    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(label, mx, my)
+  }
 
   ctx.restore()
 }
@@ -498,7 +558,7 @@ export default function OntologyGraph({
 
   useEffect(() => {
     if (graphRef.current) {
-      setTimeout(() => graphRef.current?.zoomToFit(600, 30), 300)
+      setTimeout(() => graphRef.current?.zoomToFit(0, 30), 100)
     }
   }, [data])
 
@@ -627,9 +687,9 @@ export default function OntologyGraph({
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
         onZoom={(transform) => setZoomLevel(transform.k)}
-        cooldownTicks={150}
-        d3AlphaDecay={0.04}
-        d3VelocityDecay={0.4}
+        cooldownTicks={50}
+        d3AlphaDecay={0.1}
+        d3VelocityDecay={0.5}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}

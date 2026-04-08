@@ -494,6 +494,7 @@ export default function OntologyGraph({
   const containerRef = useRef<HTMLDivElement>(null)
   const hoveredIdRef = useRef<string | null>(null)
   const [dimensions, setDimensions] = useState({ width, height })
+  const [zoomLevel, setZoomLevel] = useState(1)
 
   useEffect(() => {
     if (graphRef.current) {
@@ -512,10 +513,23 @@ export default function OntologyGraph({
       const headerH = 36
       const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
       const h = headerH + propH + 16
-      return Math.sqrt(w * w + h * h) / 2 * 1.1
+      return Math.sqrt(w * w + h * h) / 2
     }))
     graphRef.current.d3ReheatSimulation()
   }, [])
+
+  useEffect(() => {
+    if (!graphRef.current) return
+    graphRef.current.d3Force("collision", d3.forceCollide().strength(0.8).radius((node: any) => {
+      const n = node as GraphNode
+      const w = Math.max(140, n.displayName.length * 9 + 80)
+      const headerH = 36
+      const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
+      const h = headerH + propH + 16
+      return Math.sqrt(w * w + h * h) / 2 * zoomLevel
+    }))
+    graphRef.current.d3ReheatSimulation()
+  }, [zoomLevel])
 
   useEffect(() => {
     const el = containerRef.current
@@ -612,14 +626,15 @@ export default function OntologyGraph({
         linkDirectionalArrowLength={0}
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
+        onZoom={(transform) => setZoomLevel(transform.k)}
         cooldownTicks={150}
         d3AlphaDecay={0.04}
         d3VelocityDecay={0.4}
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        minZoom={0.15}
-        maxZoom={5}
+        minZoom={0.4}
+        maxZoom={2}
       />
 
       {/* Controls */}
@@ -721,76 +736,6 @@ export default function OntologyGraph({
           −
         </button>
       </div>
-
-      {/* Legend */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 16,
-          left: 16,
-          background: COLORS.panelBg,
-          border: `1px solid ${COLORS.panelBorder}`,
-          borderRadius: 10,
-          padding: "12px 16px",
-          backdropFilter: "blur(12px)",
-          minWidth: 160,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            color: COLORS.textMuted,
-            marginBottom: 8,
-          }}
-        >
-          Legend
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <LegendItem color={COLORS.class} shape="circle" label="Class (owl:Class)" />
-          <LegendItem color={COLORS.dataProp} shape="dashed" label="Data Property" />
-          <LegendItem color={COLORS.objectProp} shape="arrow" label="Object Property" />
-          <LegendItem color={COLORS.inheritance} shape="triangle" label="rdfs:subClassOf" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LegendItem({
-  color,
-  shape,
-  label,
-}: {
-  color: string
-  shape: "circle" | "dashed" | "arrow" | "triangle"
-  label: string
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <svg width="24" height="16" style={{ flexShrink: 0 }}>
-        {shape === "circle" && (
-          <circle cx="12" cy="8" r="6" fill={color} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-        )}
-        {shape === "dashed" && (
-          <line x1="2" y1="8" x2="22" y2="8" stroke={color} strokeWidth="2" strokeDasharray="4 3" />
-        )}
-        {shape === "arrow" && (
-          <>
-            <line x1="2" y1="8" x2="18" y2="8" stroke={color} strokeWidth="2" />
-            <polygon points="16,4 22,8 16,12" fill={color} />
-          </>
-        )}
-        {shape === "triangle" && (
-          <>
-            <line x1="2" y1="12" x2="12" y2="4" stroke={color} strokeWidth="2" />
-            <line x1="12" y1="4" x2="22" y2="12" stroke={color} strokeWidth="2" />
-          </>
-        )}
-      </svg>
-      <span style={{ fontSize: 11, color: COLORS.textSecondary }}>{label}</span>
     </div>
   )
 }

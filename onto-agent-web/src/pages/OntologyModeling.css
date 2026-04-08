@@ -49,6 +49,7 @@
 
 .ontology-stats {
   display: flex;
+  align-items: center;
   gap: var(--space-4);
 }
 
@@ -67,15 +68,28 @@
 }
 
 .stat-dot.class {
-  background: #ACF;
+  background: #6366F1;
 }
 
 .stat-dot.property {
-  background: #9c6;
+  background: #10B981;
 }
 
 .stat-dot.relation {
-  background: #64748B;
+  background: #F59E0B;
+}
+
+.stat-divider {
+  color: rgba(255, 255, 255, 0.15);
+  font-size: var(--text-xs);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
 }
 
 .toolbar-actions {

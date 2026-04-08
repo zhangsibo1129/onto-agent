@@ -140,13 +140,6 @@ export default function OntologyModeling() {
       {/* ---- Toolbar ---- */}
       <div className="ontology-toolbar">
         <div className="toolbar-left">
-          <nav className="breadcrumb">
-            <span className="breadcrumb-item" onClick={() => navigate("/ontologies")}>
-              本体
-            </span>
-            <span className="breadcrumb-sep">/</span>
-            <span className="breadcrumb-item active">{ontology.name}</span>
-          </nav>
           <div className="ontology-stats">
             <span className="stat-item">
               <span className="stat-dot class"></span>
@@ -159,6 +152,34 @@ export default function OntologyModeling() {
             <span className="stat-item">
               <span className="stat-dot relation"></span>
               关系: {relations.length}
+            </span>
+            <span className="stat-divider">|</span>
+            <span className="stat-item legend-item">
+              <svg width="12" height="12" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="5" fill="#6366F1" />
+              </svg>
+              类
+            </span>
+            <span className="stat-item legend-item">
+              <svg width="16" height="12" viewBox="0 0 16 12">
+                <line x1="1" y1="6" x2="12" y2="6" stroke="#10B981" strokeWidth="2" strokeDasharray="3 2" />
+                <polygon points="10,2 16,6 10,10" fill="#10B981" />
+              </svg>
+              数据属性
+            </span>
+            <span className="stat-item legend-item">
+              <svg width="16" height="12" viewBox="0 0 16 12">
+                <line x1="1" y1="6" x2="12" y2="6" stroke="#F59E0B" strokeWidth="2" />
+                <polygon points="10,2 16,6 10,10" fill="#F59E0B" />
+              </svg>
+              对象属性
+            </span>
+            <span className="stat-item legend-item">
+              <svg width="16" height="12" viewBox="0 0 16 12">
+                <line x1="2" y1="10" x2="8" y2="2" stroke="#EC4899" strokeWidth="2" />
+                <line x1="8" y1="2" x2="14" y2="10" stroke="#EC4899" strokeWidth="2" />
+              </svg>
+              父类
             </span>
           </div>
         </div>

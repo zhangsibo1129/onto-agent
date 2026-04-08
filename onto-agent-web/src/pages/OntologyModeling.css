@@ -299,6 +299,12 @@
   color: #CBD5E1;
 }
 
+.basic-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .basic-value.url {
   font-family: "SF Mono", "Fira Code", monospace;
   font-size: 9px;
@@ -362,6 +368,7 @@
   background: rgba(99, 102, 241, 0.12);
   color: #818CF8;
   border-radius: 3px;
+  font-size: 10px;
   cursor: pointer;
   transition: background 0.15s;
 }

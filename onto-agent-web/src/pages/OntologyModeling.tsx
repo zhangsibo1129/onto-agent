@@ -68,9 +68,13 @@ export default function OntologyModeling() {
   }, [])
 
   const handleCreateClass = useCallback(
-    async (name: string, displayName: string) => {
+    async (name: string, displayName: string, superClass?: string) => {
       if (!id) return
-      const newClass = await ontologyApi.createClass(id, { name, displayName })
+      const newClass = await ontologyApi.createClass(id, { 
+        name, 
+        displayName,
+        superClasses: superClass ? [superClass] : [] 
+      })
       setClasses((prev) => [...prev, newClass])
       setShowAddModal(null)
     },
@@ -123,12 +127,16 @@ export default function OntologyModeling() {
     )
   }
 
-  const relations: OntologyRelation[] = objectProperties.map((op) => ({
-    id: op.id,
-    sourceId: op.domainIds?.[0] || "",
-    targetId: op.rangeIds?.[0] || "",
-    propertyId: op.id,
-  }))
+  const relations: OntologyRelation[] = objectProperties.flatMap((op) =>
+    (op.domainIds || []).flatMap((domainId) =>
+      (op.rangeIds || []).map((rangeId) => ({
+        id: `${op.id}-${domainId}-${rangeId}`,
+        sourceId: domainId,
+        targetId: rangeId,
+        propertyId: op.id,
+      }))
+    )
+  )
 
   const getPropertyById = (propId: string) =>
     [...dataProperties, ...objectProperties].find((p) => p.id === propId)
@@ -264,6 +272,18 @@ export default function OntologyModeling() {
                       <span className="basic-label">URL</span>
                       <span className="basic-value url">{baseIri}{selectedClass.name}</span>
                     </div>
+                    {selectedClass.superClasses && selectedClass.superClasses.length > 0 && (
+                      <div className="basic-info-row">
+                        <span className="basic-label">父类</span>
+                        <div className="basic-tags">
+                          {selectedClass.superClasses.map((sc) => (
+                            <span key={sc} className="rel-tag" onClick={() => setSelectedClassId(sc)}>
+                              {getClassById(sc)?.displayName || sc}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {selectedClass.description && (
                       <div className="basic-info-row">
                         <span className="basic-label">描述</span>
@@ -400,6 +420,17 @@ export default function OntologyModeling() {
                     <input type="text" className="form-input" placeholder="产品" id="classDisplayName" />
                   </div>
                   <div className="form-group">
+                    <label className="form-label">父类</label>
+                    <select className="form-select" id="classSuperClass">
+                      <option value="">无（顶层类）</option>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName || c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">描述</label>
                     <input type="text" className="form-input" placeholder="商品或服务实体" id="classDescription" />
                   </div>
@@ -484,8 +515,9 @@ export default function OntologyModeling() {
                   if (showAddModal === "class") {
                     const nameInput = document.getElementById("className") as HTMLInputElement
                     const displayInput = document.getElementById("classDisplayName") as HTMLInputElement
+                    const superClassSelect = document.getElementById("classSuperClass") as HTMLSelectElement
                     if (nameInput.value) {
-                      handleCreateClass(nameInput.value, displayInput.value || nameInput.value)
+                      handleCreateClass(nameInput.value, displayInput.value || nameInput.value, superClassSelect.value)
                     }
                   } else if (showAddModal === "dataProperty") {
                     const nameInput = document.getElementById("propName") as HTMLInputElement

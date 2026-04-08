@@ -653,7 +653,6 @@ export default function OntologyGraph({
       if (dragStartPosRef.current) return
       const id = (node as GraphNode).id
       selectedIdRef.current = selectedIdRef.current === id ? null : id
-      graphRef.current?.refresh()
       onClassSelect?.(id)
     },
     [onClassSelect]
@@ -691,7 +690,7 @@ export default function OntologyGraph({
   )
 
   const onZoom = useCallback((transform: { k: number }) => {
-    setZoomLevel(transform.k)
+    requestAnimationFrame(() => setZoomLevel(transform.k))
   }, [])
 
   return (

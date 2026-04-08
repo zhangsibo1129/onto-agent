@@ -22,6 +22,16 @@ interface OntologyRelation {
   propertyId: string
 }
 
+const CHARACTERISTIC_LABELS: Record<string, string> = {
+  functional: "Func",
+  inverseFunctional: "InvFunc",
+  transitive: "Trans",
+  symmetric: "Sym",
+  asymmetric: "Asym",
+  reflexive: "Refl",
+  irreflexive: "Irrefl",
+}
+
 // ============================================================
 // Main Component
 // ============================================================
@@ -152,6 +162,8 @@ export default function OntologyModeling() {
     "date",
   ]
 
+  const baseIri = ontology.baseIri
+
   return (
     <div className="ontology-canvas">
       {/* ---- Toolbar ---- */}
@@ -231,115 +243,172 @@ export default function OntologyModeling() {
             <>
               <div className="panel-header">
                 <div className="panel-title">
-                  <svg className="panel-icon" viewBox="0 0 24 24" width="20" height="20">
+                  <svg className="panel-icon" viewBox="0 0 24 24" width="16" height="16">
                     <circle cx="12" cy="12" r="10" fill="#6366F1" stroke="#1E293B" strokeWidth="2" />
                   </svg>
                   <span className="panel-name">{selectedClass.displayName || selectedClass.name}</span>
                 </div>
                 <button className="panel-close" onClick={() => setSelectedClassId(null)}>
-                  <svg viewBox="0 0 24 24" width="16" height="16">
+                  <svg viewBox="0 0 24 24" width="14" height="14">
                     <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
               </div>
 
               <div className="panel-body">
+                {/* IRI */}
+                <div className="iri-path">{baseIri}{selectedClass.name}</div>
+
+                {/* Basic Info */}
                 <div className="panel-section">
                   <div className="section-header">
-                    <span className="section-icon">ℹ</span>
                     <span className="section-title">基本信息</span>
                   </div>
-                  <div className="info-grid">
-                    <div className="info-item">
-                      <span className="info-label">英文名</span>
-                      <span className="info-value mono">{selectedClass.name}</span>
+                  <div className="info-list">
+                    <div className="info-row">
+                      <span className="info-key">Name</span>
+                      <span className="info-val mono">{selectedClass.name}</span>
                     </div>
-                    <div className="info-item">
-                      <span className="info-label">类型</span>
-                      <span className="info-value">
-                        <span className="type-badge class">owl:Class</span>
-                      </span>
+                    <div className="info-row">
+                      <span className="info-key">DisplayName</span>
+                      <span className="info-val">{selectedClass.displayName || "-"}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-key">Type</span>
+                      <span className="info-val"><span className="type-badge class">owl:Class</span></span>
                     </div>
                     {selectedClass.description && (
-                      <div className="info-item full">
-                        <span className="info-label">描述</span>
-                        <span className="info-value">{selectedClass.description}</span>
-                      </div>
-                    )}
-                    {selectedClass.superClasses && selectedClass.superClasses.length > 0 && (
-                      <div className="info-item full">
-                        <span className="info-label">父类</span>
-                        <span className="info-value">
-                          {selectedClass.superClasses.map((sc) => getClassById(sc)?.displayName || sc).join(", ")}
-                        </span>
-                      </div>
-                    )}
-                    {selectedClass.equivalentTo && selectedClass.equivalentTo.length > 0 && (
-                      <div className="info-item full">
-                        <span className="info-label">等价类</span>
-                        <span className="info-value">
-                          {selectedClass.equivalentTo.map((eq) => getClassById(eq)?.displayName || eq).join(", ")}
-                        </span>
-                      </div>
-                    )}
-                    {selectedClass.disjointWith && selectedClass.disjointWith.length > 0 && (
-                      <div className="info-item full">
-                        <span className="info-label">不相交类</span>
-                        <span className="info-value">
-                          {selectedClass.disjointWith.map((dw) => getClassById(dw)?.displayName || dw).join(", ")}
-                        </span>
+                      <div className="info-row">
+                        <span className="info-key">Description</span>
+                        <span className="info-val desc">{selectedClass.description}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* Class Axioms */}
+                {(selectedClass.superClasses?.length > 0 || selectedClass.equivalentTo?.length > 0 || selectedClass.disjointWith?.length > 0) && (
+                  <div className="panel-section">
+                    <div className="section-header">
+                      <span className="section-title">OWL 2 类公理</span>
+                    </div>
+                    <div className="info-list">
+                      {selectedClass.superClasses?.length > 0 && (
+                        <div className="info-row">
+                          <span className="info-key">rdfs:subClassOf</span>
+                          <span className="info-val links">
+                            {selectedClass.superClasses.map((sc) => (
+                              <span key={sc} className="link-tag" onClick={() => setSelectedClassId(sc)}>
+                                {getClassById(sc)?.displayName || sc}
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+                      )}
+                      {selectedClass.equivalentTo?.length > 0 && (
+                        <div className="info-row">
+                          <span className="info-key">owl:equivalentTo</span>
+                          <span className="info-val links">
+                            {selectedClass.equivalentTo.map((eq) => (
+                              <span key={eq} className="link-tag" onClick={() => setSelectedClassId(eq)}>
+                                {getClassById(eq)?.displayName || eq}
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+                      )}
+                      {selectedClass.disjointWith?.length > 0 && (
+                        <div className="info-row">
+                          <span className="info-key">owl:disjointWith</span>
+                          <span className="info-val links">
+                            {selectedClass.disjointWith.map((dw) => (
+                              <span key={dw} className="link-tag disjoint" onClick={() => setSelectedClassId(dw)}>
+                                {getClassById(dw)?.displayName || dw}
+                              </span>
+                            ))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Properties */}
                 {selectedClassDataProperties.length > 0 && (
                   <div className="panel-section">
                     <div className="section-header">
-                      <span className="section-icon" style={{ color: "#10B981" }}>
-                        ─
-                      </span>
                       <span className="section-title">数据属性</span>
                       <span className="section-count">{selectedClassDataProperties.length}</span>
                     </div>
-                    <div className="property-list">
+                    <div className="prop-table">
+                      <div className="prop-table-header">
+                        <span>名称</span>
+                        <span>定义域</span>
+                        <span>类型</span>
+                        <span>特性</span>
+                      </div>
                       {selectedClassDataProperties.map((prop) => (
-                        <div key={prop.id} className="property-item data">
-                          <div className="property-main">
-                            <span className="prop-name">{prop.displayName || prop.name}</span>
-                            {prop.characteristics?.includes("functional") && (
-                              <span className="prop-badge">函数</span>
-                            )}
-                          </div>
-                          <span className="prop-type">{prop.rangeType}</span>
+                        <div key={prop.id} className="prop-table-row">
+                          <span className="prop-name-cell">
+                            <span className="prop-display">{prop.displayName || prop.name}</span>
+                            <span className="prop-name-mono">{prop.name}</span>
+                          </span>
+                          <span className="prop-domain-cell">
+                            {(prop.domainIds || []).map((did) => (
+                              <span key={did} className="link-tag sm">{getClassById(did)?.displayName || did}</span>
+                            ))}
+                          </span>
+                          <span className="prop-type-cell">{prop.rangeType}</span>
+                          <span className="prop-char-cell">
+                            {(prop.characteristics || []).map((c) => (
+                              <span key={c} className="char-badge">{CHARACTERISTIC_LABELS[c] || c}</span>
+                            ))}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {/* Object Properties */}
                 {selectedClassObjectProperties.length > 0 && (
                   <div className="panel-section">
                     <div className="section-header">
-                      <span className="section-icon" style={{ color: "#F59E0B" }}>
-                        ●
-                      </span>
                       <span className="section-title">对象属性</span>
                       <span className="section-count">{selectedClassObjectProperties.length}</span>
                     </div>
-                    <div className="property-list">
+                    <div className="prop-table">
+                      <div className="prop-table-header">
+                        <span>名称</span>
+                        <span>定义域</span>
+                        <span>值域</span>
+                        <span>特性</span>
+                      </div>
                       {selectedClassObjectProperties.map((prop) => (
-                        <div key={prop.id} className="property-item object">
-                          <div className="property-main">
-                            <span className="prop-name">{prop.displayName || prop.name}</span>
-                            <div className="prop-badges">
-                              {(prop.characteristics || []).map((char) => (
-                                <span key={char} className="prop-badge">{char}</span>
-                              ))}
-                            </div>
-                          </div>
-                          <span className="prop-range">
-                            → {(prop.rangeIds || []).map((rid) => getClassById(rid)?.displayName || rid).join(", ")}
+                        <div key={prop.id} className="prop-table-row">
+                          <span className="prop-name-cell">
+                            <span className="prop-display">{prop.displayName || prop.name}</span>
+                            <span className="prop-name-mono">{prop.name}</span>
+                          </span>
+                          <span className="prop-domain-cell">
+                            {(prop.domainIds || []).map((did) => (
+                              <span key={did} className="link-tag sm">{getClassById(did)?.displayName || did}</span>
+                            ))}
+                          </span>
+                          <span className="prop-range-cell">
+                            {(prop.rangeIds || []).map((rid) => (
+                              <span key={rid} className="link-tag sm" onClick={() => setSelectedClassId(rid)}>
+                                {getClassById(rid)?.displayName || rid}
+                              </span>
+                            ))}
+                          </span>
+                          <span className="prop-char-cell">
+                            {(prop.characteristics || []).map((c) => (
+                              <span key={c} className="char-badge">{CHARACTERISTIC_LABELS[c] || c}</span>
+                            ))}
+                            {prop.inverseOfId && (
+                              <span className="inverse-tag" title={`Inverse: ${prop.inverseOfId}`}>inv</span>
+                            )}
                           </span>
                         </div>
                       ))}
@@ -347,26 +416,24 @@ export default function OntologyModeling() {
                   </div>
                 )}
 
+                {/* Relations */}
                 {incomingRelations.length > 0 && (
                   <div className="panel-section">
                     <div className="section-header">
-                      <span className="section-icon" style={{ color: "#6366F1" }}>
-                        ←
-                      </span>
                       <span className="section-title">入向关系</span>
                       <span className="section-count">{incomingRelations.length}</span>
                     </div>
-                    <div className="relation-list">
+                    <div className="relation-list-compact">
                       {incomingRelations.map((rel) => (
-                        <div key={rel.id} className="relation-item">
-                          <span className="rel-arrow">←</span>
-                          <span className="rel-name">
-                            {getPropertyById(rel.propertyId)?.displayName ||
-                              getPropertyById(rel.propertyId)?.name ||
-                              rel.propertyId}
+                        <div key={rel.id} className="rel-row">
+                          <span className="rel-source">
+                            <span className="rel-arrow">←</span>
+                            <span className="link-tag sm" onClick={() => setSelectedClassId(rel.sourceId)}>
+                              {getClassById(rel.sourceId)?.displayName || rel.sourceId}
+                            </span>
                           </span>
-                          <span className="rel-from">
-                            ← {getClassById(rel.sourceId)?.displayName || rel.sourceId}
+                          <span className="rel-prop">
+                            {getPropertyById(rel.propertyId)?.displayName || rel.propertyId}
                           </span>
                         </div>
                       ))}
@@ -377,23 +444,20 @@ export default function OntologyModeling() {
                 {outgoingRelations.length > 0 && (
                   <div className="panel-section">
                     <div className="section-header">
-                      <span className="section-icon" style={{ color: "#6366F1" }}>
-                        →
-                      </span>
                       <span className="section-title">出向关系</span>
                       <span className="section-count">{outgoingRelations.length}</span>
                     </div>
-                    <div className="relation-list">
+                    <div className="relation-list-compact">
                       {outgoingRelations.map((rel) => (
-                        <div key={rel.id} className="relation-item">
-                          <span className="rel-arrow">→</span>
-                          <span className="rel-name">
-                            {getPropertyById(rel.propertyId)?.displayName ||
-                              getPropertyById(rel.propertyId)?.name ||
-                              rel.propertyId}
+                        <div key={rel.id} className="rel-row">
+                          <span className="rel-prop">
+                            {getPropertyById(rel.propertyId)?.displayName || rel.propertyId}
                           </span>
-                          <span className="rel-to">
-                            → {getClassById(rel.targetId)?.displayName || rel.targetId}
+                          <span className="rel-target">
+                            <span className="link-tag sm" onClick={() => setSelectedClassId(rel.targetId)}>
+                              {getClassById(rel.targetId)?.displayName || rel.targetId}
+                            </span>
+                            <span className="rel-arrow">→</span>
                           </span>
                         </div>
                       ))}

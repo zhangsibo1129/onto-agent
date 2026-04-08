@@ -389,14 +389,23 @@ function renderLink(
   const linkColor = isHighlighted ? COLORS.objectProp : COLORS.linkDefault
   const linkWidth = isHighlighted ? 2.5 * globalScale : 1.5 * globalScale
 
-  const [ex2, ey2] = lineRectIntersect(sx, sy, tx, ty, sx, sy, shw, shh)
-  const [ex1, ey1] = lineRectIntersect(sx, sy, tx, ty, tx, ty, thw, thh)
-
   const dx = tx - sx
   const dy = ty - sy
   const dist = Math.sqrt(dx * dx + dy * dy) || 1
   const nx = dx / dist
   const ny = dy / dist
+
+  const extendBack = 5000
+  const [ex2, ey2] = lineRectIntersect(
+    tx + nx * extendBack, ty + ny * extendBack,
+    sx, sy,
+    sx, sy, shw, shh
+  )
+  const [ex1, ey1] = lineRectIntersect(
+    sx - nx * extendBack, sy - ny * extendBack,
+    tx, ty,
+    tx, ty, thw, thh
+  )
 
   const arrowSize = 12 * globalScale
 
@@ -452,13 +461,6 @@ function renderLink(
   const fontSize = Math.max(9, 10 * globalScale)
   ctx.font = `400 ${fontSize}px Inter, sans-serif`
   const label = link.type === "inheritance" ? "⊆" : link.displayName
-  const textWidth = ctx.measureText(label).width
-  const pad = 4
-
-  ctx.fillStyle = "rgba(15, 23, 42, 0.9)"
-  ctx.beginPath()
-  ctx.roundRect(mx - textWidth / 2 - pad, my - fontSize / 2 - 2, textWidth + pad * 2, fontSize + 4, 3)
-  ctx.fill()
 
   ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
   ctx.textAlign = "center"
@@ -501,9 +503,17 @@ export default function OntologyGraph({
 
   useEffect(() => {
     if (!graphRef.current) return
-    graphRef.current.d3Force("charge", d3.forceManyBody().strength(-800).distanceMax(500))
-    graphRef.current.d3Force("link", d3.forceLink().distance(250).strength(0.3))
+    graphRef.current.d3Force("charge", d3.forceManyBody().strength(-400).distanceMax(400))
+    graphRef.current.d3Force("link", d3.forceLink().strength(0.05))
     graphRef.current.d3Force("center", d3.forceCenter(0, 0).strength(0.05))
+    graphRef.current.d3Force("collision", d3.forceCollide().strength(0.8).radius((node: any) => {
+      const n = node as GraphNode
+      const w = Math.max(140, n.displayName.length * 9 + 80)
+      const headerH = 36
+      const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
+      const h = headerH + propH + 16
+      return Math.sqrt(w * w + h * h) / 2 * 1.1
+    }))
     graphRef.current.d3ReheatSimulation()
   }, [])
 

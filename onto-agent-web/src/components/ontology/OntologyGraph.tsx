@@ -50,12 +50,14 @@ const COLORS = {
   nodeBg: "rgba(30, 41, 59, 0.95)",
   nodeBorder: "rgba(255, 255, 255, 0.15)",
   nodeBorderSelected: "#6366F1",
+  nodeHeaderBg: "rgba(99, 102, 241, 0.15)",
 
   text: "#F1F5F9",
   textSecondary: "#94A3B8",
   textMuted: "#64748B",
 
   linkDefault: "#475569",
+  linkHighlight: "#F59E0B",
 
   panelBg: "rgba(30, 41, 59, 0.98)",
   panelBorder: "rgba(255, 255, 255, 0.1)",
@@ -426,21 +428,17 @@ function renderLink(
 
   ctx.save()
 
-  ctx.beginPath()
-  ctx.moveTo(ex2, ey2)
-  ctx.lineTo(ex1, ey1)
-  ctx.strokeStyle = linkColor
-  ctx.lineWidth = linkWidth
-  if (link.type === "inheritance") {
-    ctx.setLineDash([])
-  } else if (link.type === "data") {
-    ctx.setLineDash([6 * globalScale, 4 * globalScale])
-  }
-  ctx.stroke()
-  ctx.setLineDash([])
+  const arrowBack = arrowSize * Math.cos(Math.PI / 7)
 
   if (link.type === "object") {
     const angle = Math.atan2(dy, dx)
+    ctx.beginPath()
+    ctx.moveTo(ex2, ey2)
+    ctx.lineTo(ex1 - arrowBack * Math.cos(angle), ey1 - arrowBack * Math.sin(angle))
+    ctx.strokeStyle = linkColor
+    ctx.lineWidth = linkWidth
+    ctx.stroke()
+
     ctx.beginPath()
     ctx.moveTo(ex1, ey1)
     ctx.lineTo(
@@ -454,10 +452,24 @@ function renderLink(
     ctx.closePath()
     ctx.fillStyle = linkColor
     ctx.fill()
-  }
-
-  if (link.type === "bidirectional") {
+  } else if (link.type === "bidirectional") {
     const linkAngle = Math.atan2(dy, dx)
+
+    // --- 逆向箭头根部（线段起点）和正向箭头根部（线段终点）---
+    const revEndX = ex2 + arrowBack * Math.cos(linkAngle)
+    const revEndY = ey2 + arrowBack * Math.sin(linkAngle)
+    const fwdEndX = ex1 - arrowBack * Math.cos(linkAngle)
+    const fwdEndY = ey1 - arrowBack * Math.sin(linkAngle)
+
+    // --- 线段：从逆向箭头根部到正向箭头根部 ---
+    ctx.beginPath()
+    ctx.moveTo(revEndX, revEndY)
+    ctx.lineTo(fwdEndX, fwdEndY)
+    ctx.strokeStyle = linkColor
+    ctx.lineWidth = linkWidth
+    ctx.stroke()
+
+    // --- 正向箭头（尖端在 ex1）---
     ctx.beginPath()
     ctx.moveTo(ex1, ey1)
     ctx.lineTo(
@@ -472,6 +484,7 @@ function renderLink(
     ctx.fillStyle = linkColor
     ctx.fill()
 
+    // --- 逆向箭头（尖端在 ex2，指向源节点，翅膀沿 +linkAngle 方向向后延伸）---
     ctx.beginPath()
     ctx.moveTo(ex2, ey2)
     ctx.lineTo(
@@ -490,26 +503,14 @@ function renderLink(
     ctx.font = `400 ${fontSize}px Inter, sans-serif`
     const labels = link.displayName.split("|")
 
-    const mx = (ex1 + ex2) / 2
-    const my = (ey1 + ey2) / 2
-    const linkLen = Math.sqrt((ex2 - ex1) ** 2 + (ey2 - ey1) ** 2)
-    const labelGap = Math.min(20 * globalScale, linkLen / 4)
-
-    ctx.save()
-    ctx.translate(mx - nx * labelGap, my - ny * labelGap)
+    // 正向标签：靠近正向箭头根部 fwdEnd，往 -linkAngle 方向偏移
     ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
-    ctx.fillText(labels[0], 0, 0)
-    ctx.restore()
+    ctx.fillText(labels[0], fwdEndX - nx * 15, fwdEndY - ny * 15)
 
-    ctx.save()
-    ctx.translate(mx + nx * labelGap, my + ny * labelGap)
-    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    ctx.fillText(labels[1], 0, 0)
-    ctx.restore()
+    // 逆向标签：靠近逆向箭头根部 revEnd，往 +linkAngle 方向偏移
+    ctx.fillText(labels[1] || "", revEndX + nx * 15, revEndY + ny * 15)
   }
 
   if (link.type === "inheritance") {
@@ -568,6 +569,8 @@ export default function OntologyGraph({
   const hoveredIdRef = useRef<string | null>(null)
   const [dimensions, setDimensions] = useState({ width, height })
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (graphRef.current) {
@@ -619,9 +622,9 @@ export default function OntologyGraph({
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      renderNode(ctx, node, globalScale, selectedClassId ?? null, hoveredIdRef.current)
+      renderNode(ctx, node, globalScale, selectedClassId ?? null, hoveredId)
     },
-    [selectedClassId]
+    [selectedClassId, hoveredId]
   )
 
   const nodePointerAreaPaint = useCallback(
@@ -647,16 +650,35 @@ export default function OntologyGraph({
 
   const onNodeClick = useCallback(
     (node: NodeObject) => {
+      if (dragStartPosRef.current) return
       onClassSelect?.((node as GraphNode).id)
     },
     [onClassSelect]
   )
 
+  const onNodeDrag = useCallback(
+    (_node: NodeObject, _translate: { x: number; y: number }) => {
+      if (!dragStartPosRef.current) {
+        dragStartPosRef.current = { x: 0, y: 0 }
+      }
+    },
+    []
+  )
+
+  const onNodeDragEnd = useCallback(
+    (_node: NodeObject) => {
+      dragStartPosRef.current = null
+    },
+    []
+  )
+
   const onNodeHover = useCallback(
     (node: NodeObject | null) => {
-      hoveredIdRef.current = node ? (node as GraphNode).id : null
+      const id = node ? (node as GraphNode).id : null
+      hoveredIdRef.current = id
+      setHoveredId(id)
       if (containerRef.current) {
-        containerRef.current.style.cursor = node ? "pointer" : "grab"
+        containerRef.current.style.cursor = id ? "pointer" : "grab"
       }
     },
     []
@@ -699,6 +721,8 @@ export default function OntologyGraph({
         linkDirectionalArrowLength={0}
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
+        onNodeDrag={onNodeDrag}
+        onNodeDragEnd={onNodeDragEnd}
         onZoom={(transform) => setZoomLevel(transform.k)}
         cooldownTicks={50}
         d3AlphaDecay={0.1}

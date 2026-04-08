@@ -145,23 +145,23 @@ export default function OntologyModeling() {
           <div className="ontology-stats">
             <div className="stat-group">
               <svg className="stat-icon" viewBox="0 0 20 20" width="14" height="14">
-                <rect x="2" y="4" width="16" height="12" rx="3" fill="#475569" fillOpacity="0.2" stroke="#475569" strokeWidth="1.5" />
-                <line x1="2" y1="9" x2="18" y2="9" stroke="#475569" strokeWidth="1" />
+                <rect x="2" y="4" width="16" height="12" rx="3" fill="#6366F1" fillOpacity="0.2" stroke="#6366F1" strokeWidth="1.5" />
+                <line x1="2" y1="9" x2="18" y2="9" stroke="#6366F1" strokeWidth="1" />
               </svg>
               <span className="stat-label">对象</span>
               <span className="stat-value">{classes.length}</span>
             </div>
             <div className="stat-group">
               <svg className="stat-icon" viewBox="0 0 16 16" width="14" height="14">
-                <circle cx="8" cy="8" r="6" fill="#10B981" fillOpacity="0.3" stroke="#10B981" strokeWidth="1.5" />
+                <circle cx="8" cy="8" r="5" fill="#10B981" />
               </svg>
               <span className="stat-label">属性</span>
               <span className="stat-value">{dataProperties.length + objectProperties.length}</span>
             </div>
             <div className="stat-group">
               <svg className="stat-icon" viewBox="0 0 16 16" width="14" height="14">
-                <line x1="1" y1="8" x2="10" y2="8" stroke="#64748B" strokeWidth="2" />
-                <polygon points="8,4 14,8 8,12" fill="#64748B" />
+                <line x1="1" y1="8" x2="10" y2="8" stroke="#F59E0B" strokeWidth="2" />
+                <polygon points="8,4 14,8 8,12" fill="#F59E0B" />
               </svg>
               <span className="stat-label">关系</span>
               <span className="stat-value">{relations.length}</span>

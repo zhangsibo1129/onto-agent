@@ -310,11 +310,14 @@ function renderNode(
   node: GraphNode,
   globalScale: number,
   selectedId: string | null,
-  hoveredId: string | null
+  hoveredId: string | null,
+  hoveredLinkId: string | null,
+  hoveredLinkNodes: Set<string>
 ) {
   const isSelected = node.id === selectedId
   const isHovered = node.id === hoveredId
-  const isHighlighted = isSelected || isHovered
+  const isLinkHovered = hoveredLinkNodes.has(node.id)
+  const isHighlighted = isSelected || isHovered || isLinkHovered
 
   const { w, h, hw, hh } = getNodeDims(node, globalScale)
   const headerH = 14 * globalScale
@@ -418,7 +421,8 @@ function renderLink(
   targetNode: GraphNode,
   globalScale: number,
   selectedClassId: string | null,
-  hoveredId: string | null
+  hoveredId: string | null,
+  hoveredLinkId: string | null
 ) {
   const sx = sourceNode.x || 0
   const sy = sourceNode.y || 0
@@ -430,7 +434,8 @@ function renderLink(
 
   const isHighlighted =
     sourceNode.id === selectedClassId || targetNode.id === selectedClassId ||
-    sourceNode.id === hoveredId || targetNode.id === hoveredId
+    sourceNode.id === hoveredId || targetNode.id === hoveredId ||
+    link.propertyId === hoveredLinkId
 
   const linkColor = isHighlighted ? COLORS.objectProp : COLORS.linkDefault
   const linkWidth = isHighlighted ? 2.5 * globalScale : 1.5 * globalScale
@@ -617,6 +622,7 @@ export default function OntologyGraph({
   const [dimensions, setDimensions] = useState({ width, height })
   const [zoomLevel, setZoomLevel] = useState(1)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef(false)
@@ -669,11 +675,27 @@ export default function OntologyGraph({
 
   const { nodes, links } = useMemo(() => buildGraphData(data), [data])
 
+  const hoveredLinkNodes = useMemo(() => {
+    const nodes = new Set<string>()
+    if (hoveredLinkId) {
+      const link = links.find(l => l.propertyId === hoveredLinkId)
+      if (link) {
+        if (typeof link.source === 'object') {
+          nodes.add((link.source as GraphNode).id)
+        }
+        if (typeof link.target === 'object') {
+          nodes.add((link.target as GraphNode).id)
+        }
+      }
+    }
+    return nodes
+  }, [hoveredLinkId, links])
+
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      renderNode(ctx, node, globalScale, selectedIdRef.current, hoveredId)
+      renderNode(ctx, node, globalScale, selectedIdRef.current, hoveredId, hoveredLinkId, hoveredLinkNodes)
     },
-    [hoveredId]
+    [hoveredId, hoveredLinkId, hoveredLinkNodes]
   )
 
   const nodePointerAreaPaint = useCallback(
@@ -692,9 +714,9 @@ export default function OntologyGraph({
       const source = link.source as GraphNode
       const target = link.target as GraphNode
       if (!source || !target || source.x == null || target.x == null) return
-      renderLink(ctx, link, source, target, globalScale, selectedIdRef.current, hoveredId)
+      renderLink(ctx, link, source, target, globalScale, selectedIdRef.current, hoveredId, hoveredLinkId)
     },
-    [hoveredId]
+    [hoveredId, hoveredLinkId]
   )
 
   const onNodeClick = useCallback(
@@ -733,6 +755,19 @@ export default function OntologyGraph({
       }
       if (containerRef.current) {
         containerRef.current.style.cursor = id ? "pointer" : "grab"
+      }
+    },
+    []
+  )
+
+  const onLinkHover = useCallback(
+    (link: LinkObject | null) => {
+      const id = link ? (link as GraphLink).propertyId : null
+      if (!isDraggingRef.current) {
+        setHoveredLinkId(id)
+      }
+      if (containerRef.current) {
+        containerRef.current.style.cursor = id ? "pointer" : "default"
       }
     },
     []
@@ -779,6 +814,7 @@ export default function OntologyGraph({
         linkDirectionalArrowLength={0}
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
+        onLinkHover={onLinkHover}
         onNodeDrag={onNodeDrag}
         onNodeDragEnd={onNodeDragEnd}
         onZoom={onZoom}
@@ -788,6 +824,7 @@ export default function OntologyGraph({
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
+        enableLinkInteraction={true}
         minZoom={0.75}
         maxZoom={2}
       />

@@ -791,53 +791,6 @@ export default function OntologyGraph({
         minZoom={0.5}
         maxZoom={1.5}
       />
-
-      {/* Zoom Slider */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 16,
-          right: 16,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 6,
-          background: COLORS.panelBg,
-          border: `1px solid ${COLORS.panelBorder}`,
-          borderRadius: 8,
-          padding: "10px 8px",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <span style={{ color: COLORS.textMuted, fontSize: 10 }}>1.5</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round((zoomLevel - 0.5) / 1 * 100)}
-          onChange={(e) => {
-            const value = parseInt(e.target.value) / 100
-            const targetZoom = 0.5 + value
-            const snappedZoom = Math.abs(targetZoom - 1) < 0.08 ? 1 : targetZoom
-            if (graphRef.current) {
-              graphRef.current.zoom(snappedZoom, 200)
-            }
-          }}
-          style={{
-            width: 4,
-            height: 80,
-            appearance: "none",
-            background: `linear-gradient(to top, ${COLORS.panelBorder} ${Math.round((zoomLevel - 0.5) / 1 * 100)}%, transparent ${Math.round((zoomLevel - 0.5) / 1 * 100)}%)`,
-            borderRadius: 2,
-            outline: "none",
-            cursor: "pointer",
-            writingMode: "vertical-lr",
-            direction: "rtl",
-          }}
-        />
-        <span style={{ color: Math.abs(zoomLevel - 1) < 0.08 ? "#6366F1" : COLORS.textMuted, fontSize: 10, fontWeight: Math.abs(zoomLevel - 1) < 0.08 ? 600 : 400 }}>1</span>
-        <span style={{ color: COLORS.textMuted, fontSize: 10 }}>0.5</span>
-      </div>
     </div>
   )
 }

@@ -11,15 +11,15 @@ export interface OntologyClass {
   name: string
   displayName: string
   description?: string
-  subClassOf?: string // parent class id
+  subClassOf?: string
 }
 
 export interface DataProperty {
   id: string
   name: string
   displayName: string
-  domainId: string // class id
-  rangeType: string // String, Integer, Float, Boolean, Date, etc.
+  domainId: string
+  rangeType: string
   isRequired?: boolean
 }
 
@@ -27,8 +27,8 @@ export interface ObjectProperty {
   id: string
   name: string
   displayName: string
-  domainId: string // source class id
-  rangeId: string // target class id
+  domainId: string
+  rangeId: string
   cardinality?: "1:1" | "1:N" | "N:1" | "N:N"
 }
 
@@ -38,15 +38,14 @@ export interface OntologyGraphData {
   objectProperties: ObjectProperty[]
 }
 
-// VOWL-inspired color scheme
 const COLORS = {
-  class: "#6366F1", // indigo - classes
+  class: "#6366F1",
   classHover: "#818CF8",
   classSelected: "#4F46E5",
 
-  dataProp: "#10B981", // emerald - data properties
-  objectProp: "#F59E0B", // amber - object properties
-  inheritance: "#EC4899", // pink - subClassOf
+  dataProp: "#10B981",
+  objectProp: "#F59E0B",
+  inheritance: "#EC4899",
 
   nodeBg: "rgba(30, 41, 59, 0.95)",
   nodeBorder: "rgba(255, 255, 255, 0.15)",
@@ -57,9 +56,6 @@ const COLORS = {
   textMuted: "#64748B",
 
   linkDefault: "#475569",
-  linkDataProp: "#10B981",
-  linkObjectProp: "#F59E0B",
-  linkInheritance: "#EC4899",
 
   panelBg: "rgba(30, 41, 59, 0.98)",
   panelBorder: "rgba(255, 255, 255, 0.1)",
@@ -68,16 +64,11 @@ const COLORS = {
   gridColor: "rgba(255, 255, 255, 0.03)",
 }
 
-// ============================================================
-// Graph Node / Link Types (for force-graph)
-// ============================================================
-
 interface GraphNode extends NodeObject {
   id: string
   name: string
   displayName: string
   subClassOf?: string
-  // computed
   dataProperties?: DataProperty[]
   objectProperties?: ObjectProperty[]
   incomingRelations?: ObjectProperty[]
@@ -94,13 +85,12 @@ interface GraphLink extends LinkObject {
 }
 
 // ============================================================
-// Helpers
+// Graph Data Builder
 // ============================================================
 
 function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: GraphLink[] } {
   const { classes, dataProperties, objectProperties } = data
 
-  // Group properties by class
   const dataPropsByClass = new Map<string, DataProperty[]>()
   const objPropsByClass = new Map<string, ObjectProperty[]>()
   const incomingByClass = new Map<string, ObjectProperty[]>()
@@ -135,7 +125,6 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
 
   const links: GraphLink[] = []
 
-  // Object properties as links
   for (const op of objectProperties) {
     links.push({
       source: op.domainId,
@@ -148,7 +137,6 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
     })
   }
 
-  // Inheritance as links
   for (const cls of classes) {
     if (cls.subClassOf) {
       links.push({
@@ -167,130 +155,81 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
 }
 
 // ============================================================
-// Custom Node Canvas Rendering (VOWL-style compact card)
+// Node Dimensions (in screen pixels, scaled by globalScale)
 // ============================================================
 
-function renderNodeCanvas(
-  ctx: CanvasRenderingContext2D,
-  node: GraphNode,
-  _width: number,
-  _height: number,
-  transform: { x: number; y: number; k: number },
-  selectedId: string | null,
-  hoveredId: string | null
-) {
-  const isSelected = node.id === selectedId
-  const isHovered = node.id === hoveredId
-  const isHighlighted = isSelected || isHovered
-
-  const nodeWidth = Math.max(140, node.displayName.length * 9 + 80)
-  const headerHeight = 36
-  const propLineHeight = 18
-  const maxVisibleProps = 5
-  const visibleDataProps = (node.dataProperties || []).slice(0, maxVisibleProps)
-  const nodeHeight = headerHeight + visibleDataProps.length * propLineHeight + 16
-
-  // Node position (center)
-  const px = (node.x || 0) * transform.k + transform.x
-  const py = (node.y || 0) * transform.k + transform.y
-
-  ctx.save()
-
-  // Glow effect for selected/hovered
-  if (isHighlighted) {
-    ctx.shadowColor = isSelected ? COLORS.classSelected : COLORS.classHover
-    ctx.shadowBlur = 20 * transform.k
-  } else {
-    ctx.shadowColor = "rgba(0,0,0,0.5)"
-    ctx.shadowBlur = 8 * transform.k
-  }
-
-  // Card background
-  ctx.beginPath()
-  const radius = 8 * transform.k
-  _roundRect(ctx, px - nodeWidth / 2, py - nodeHeight / 2, nodeWidth, nodeHeight, radius)
-  ctx.fillStyle = COLORS.nodeBg
-  ctx.fill()
-
-  // Border
-  ctx.strokeStyle = isSelected ? COLORS.nodeBorderSelected : isHovered ? COLORS.classHover : COLORS.nodeBorder
-  ctx.lineWidth = isHighlighted ? 2 * transform.k : 1 * transform.k
-  ctx.stroke()
-
-  ctx.shadowBlur = 0
-
-  // Header background
-  ctx.beginPath()
-  _roundRectTop(ctx, px - nodeWidth / 2, py - nodeHeight / 2, nodeWidth, headerHeight, radius)
-  ctx.fillStyle = isSelected
-    ? "rgba(99, 102, 241, 0.3)"
-    : isHovered
-    ? "rgba(99, 102, 241, 0.15)"
-    : "rgba(255, 255, 255, 0.05)"
-  ctx.fill()
-
-  // Header divider
-  ctx.beginPath()
-  ctx.moveTo(px - nodeWidth / 2 + radius, py - nodeHeight / 2 + headerHeight)
-  ctx.lineTo(px + nodeWidth / 2 - radius, py - nodeHeight / 2 + headerHeight)
-  ctx.strokeStyle = COLORS.nodeBorder
-  ctx.lineWidth = 1 * transform.k
-  ctx.stroke()
-
-  // Class name
-  const fontSize = Math.max(11, 13 * transform.k)
-  ctx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`
-  ctx.fillStyle = COLORS.text
-  ctx.textAlign = "center"
-  ctx.textBaseline = "middle"
-  ctx.fillText(
-    node.displayName.length > 16 ? node.displayName.slice(0, 14) + "…" : node.displayName,
-    px,
-    py - nodeHeight / 2 + headerHeight / 2
-  )
-
-  // Properties
-  let propY = py - nodeHeight / 2 + headerHeight + 10 * transform.k
-
-  // Data properties (green dot)
-  for (const dp of visibleDataProps) {
-    const propFontSize = Math.max(9, 11 * transform.k)
-    ctx.font = `${propFontSize}px Inter, -apple-system, sans-serif`
-    ctx.fillStyle = COLORS.dataProp
-    ctx.textAlign = "left"
-    ctx.textBaseline = "top"
-    // dot
-    ctx.beginPath()
-    ctx.arc(px - nodeWidth / 2 + 10 * transform.k, propY + propFontSize / 2 - 1, 3 * transform.k, 0, Math.PI * 2)
-    ctx.fill()
-    // text: displayName (type)
-    const text = `${dp.displayName} (${dp.rangeType})`
-    ctx.fillStyle = COLORS.textSecondary
-    ctx.fillText(text.length > 22 ? text.slice(0, 20) + "…" : text, px - nodeWidth / 2 + 20 * transform.k, propY)
-    propY += propLineHeight * transform.k
-  }
-
-  // Property overflow indicator (only data properties shown in card)
-  const totalDataProps = node.dataProperties?.length || 0
-  const shownProps = visibleDataProps.length
-  if (totalDataProps > shownProps) {
-    const moreFontSize = Math.max(9, 10 * transform.k)
-    ctx.font = `400 ${moreFontSize}px Inter, sans-serif`
-    ctx.fillStyle = COLORS.textMuted
-    ctx.textAlign = "center"
-    ctx.fillText(`+${totalDataProps - shownProps} more…`, px, propY + 4 * transform.k)
-  }
-
-  ctx.restore()
+interface NodeDims {
+  w: number
+  h: number
+  hw: number
+  hh: number
 }
 
-function _roundRect(
+function getNodeDims(node: GraphNode, globalScale: number): NodeDims {
+  const baseWidth = Math.max(140, node.displayName.length * 9 + 80)
+  const headerH = 36
+  const propLineH = 18
+  const maxVisibleProps = 5
+  const visibleCount = Math.min(maxVisibleProps, node.dataProperties?.length || 0)
+  const baseHeight = headerH + visibleCount * propLineH + 16
+
+  return {
+    w: baseWidth * globalScale,
+    h: baseHeight * globalScale,
+    hw: baseWidth * globalScale / 2,
+    hh: baseHeight * globalScale / 2,
+  }
+}
+
+// ============================================================
+// Edge Intersection Math
+// ============================================================
+
+function lineRectIntersect(
+  sx: number, sy: number,
+  tx: number, ty: number,
+  rcx: number, rcy: number,
+  hw: number, hh: number
+): [number, number] {
+  const dx = tx - sx
+  const dy = ty - sy
+
+  let tmin = 0
+  let tmax = 1
+
+  const rcLeft = rcx - hw
+  const rcRight = rcx + hw
+  const rcTop = rcy - hh
+  const rcBottom = rcy + hh
+
+  if (dx !== 0) {
+    const t1 = (rcLeft - sx) / dx
+    const t2 = (rcRight - sx) / dx
+    tmin = Math.max(tmin, Math.min(t1, t2))
+    tmax = Math.min(tmax, Math.max(t1, t2))
+  }
+
+  if (dy !== 0) {
+    const t1 = (rcTop - sy) / dy
+    const t2 = (rcBottom - sy) / dy
+    tmin = Math.max(tmin, Math.min(t1, t2))
+    tmax = Math.min(tmax, Math.max(t1, t2))
+  }
+
+  if (tmin > tmax || tmin < 0 || tmin > 1) {
+    return [rcx, rcy]
+  }
+
+  return [sx + dx * tmin, sy + dy * tmin]
+}
+
+// ============================================================
+// Canvas Helpers
+// ============================================================
+
+function roundRect(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number
+  x: number, y: number, w: number, h: number, r: number
 ) {
   ctx.moveTo(x + r, y)
   ctx.lineTo(x + w - r, y)
@@ -304,13 +243,9 @@ function _roundRect(
   ctx.closePath()
 }
 
-function _roundRectTop(
+function roundRectTop(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number
+  x: number, y: number, w: number, h: number, r: number
 ) {
   ctx.moveTo(x + r, y)
   ctx.lineTo(x + w - r, y)
@@ -323,7 +258,218 @@ function _roundRectTop(
 }
 
 // ============================================================
-// Main Component
+// Node Rendering
+// ============================================================
+
+function renderNode(
+  ctx: CanvasRenderingContext2D,
+  node: GraphNode,
+  globalScale: number,
+  selectedId: string | null,
+  hoveredId: string | null
+) {
+  const isSelected = node.id === selectedId
+  const isHovered = node.id === hoveredId
+  const isHighlighted = isSelected || isHovered
+
+  const { w, h, hw, hh } = getNodeDims(node, globalScale)
+  const headerH = 36 * globalScale
+  const propLineH = 18 * globalScale
+  const maxVisibleProps = 5
+  const visibleDataProps = (node.dataProperties || []).slice(0, maxVisibleProps)
+
+  const px = node.x || 0
+  const py = node.y || 0
+
+  ctx.save()
+
+  if (isHighlighted) {
+    ctx.shadowColor = isSelected ? COLORS.classSelected : COLORS.classHover
+    ctx.shadowBlur = 20 * globalScale
+  } else {
+    ctx.shadowColor = "rgba(0,0,0,0.5)"
+    ctx.shadowBlur = 8 * globalScale
+  }
+
+  ctx.beginPath()
+  roundRect(ctx, px - hw, py - hh, w, h, 8 * globalScale)
+  ctx.fillStyle = COLORS.nodeBg
+  ctx.fill()
+
+  ctx.strokeStyle = isSelected ? COLORS.nodeBorderSelected : isHovered ? COLORS.classHover : COLORS.nodeBorder
+  ctx.lineWidth = isHighlighted ? 2 * globalScale : 1 * globalScale
+  ctx.stroke()
+
+  ctx.shadowBlur = 0
+
+  ctx.beginPath()
+  roundRectTop(ctx, px - hw, py - hh, w, headerH, 8 * globalScale)
+  ctx.fillStyle = isSelected
+    ? "rgba(99, 102, 241, 0.3)"
+    : isHovered
+    ? "rgba(99, 102, 241, 0.15)"
+    : "rgba(255, 255, 255, 0.05)"
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.moveTo(px - hw + 8 * globalScale, py - hh + headerH)
+  ctx.lineTo(px + hw - 8 * globalScale, py - hh + headerH)
+  ctx.strokeStyle = COLORS.nodeBorder
+  ctx.lineWidth = 1 * globalScale
+  ctx.stroke()
+
+  const fontSize = Math.max(11, 13 * globalScale)
+  ctx.font = `600 ${fontSize}px Inter, -apple-system, sans-serif`
+  ctx.fillStyle = COLORS.text
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillText(
+    node.displayName.length > 16 ? node.displayName.slice(0, 14) + "…" : node.displayName,
+    px,
+    py - hh + headerH / 2
+  )
+
+  let propY = py - hh + headerH + 10 * globalScale
+
+  for (const dp of visibleDataProps) {
+    const propFontSize = Math.max(9, 11 * globalScale)
+    ctx.font = `${propFontSize}px Inter, -apple-system, sans-serif`
+    ctx.fillStyle = COLORS.dataProp
+    ctx.textAlign = "left"
+    ctx.textBaseline = "top"
+    ctx.beginPath()
+    ctx.arc(px - hw + 10 * globalScale, propY + propFontSize / 2 - 1, 3 * globalScale, 0, Math.PI * 2)
+    ctx.fill()
+    const text = `${dp.displayName} (${dp.rangeType})`
+    ctx.fillStyle = COLORS.textSecondary
+    ctx.fillText(
+      text.length > 22 ? text.slice(0, 20) + "…" : text,
+      px - hw + 20 * globalScale,
+      propY
+    )
+    propY += propLineH
+  }
+
+  const totalDataProps = node.dataProperties?.length || 0
+  const shownProps = visibleDataProps.length
+  if (totalDataProps > shownProps) {
+    const moreFontSize = Math.max(9, 10 * globalScale)
+    ctx.font = `400 ${moreFontSize}px Inter, sans-serif`
+    ctx.fillStyle = COLORS.textMuted
+    ctx.textAlign = "center"
+    ctx.fillText(`+${totalDataProps - shownProps} more…`, px, propY + 4 * globalScale)
+  }
+
+  ctx.restore()
+}
+
+// ============================================================
+// Link Rendering (edge-to-edge with arrow)
+// ============================================================
+
+function renderLink(
+  ctx: CanvasRenderingContext2D,
+  link: GraphLink,
+  sourceNode: GraphNode,
+  targetNode: GraphNode,
+  globalScale: number,
+  selectedClassId: string | null
+) {
+  const sx = sourceNode.x || 0
+  const sy = sourceNode.y || 0
+  const tx = targetNode.x || 0
+  const ty = targetNode.y || 0
+
+  const { hw: shw, hh: shh } = getNodeDims(sourceNode, globalScale)
+  const { hw: thw, hh: thh } = getNodeDims(targetNode, globalScale)
+
+  const isHighlighted =
+    sourceNode.id === selectedClassId || targetNode.id === selectedClassId
+
+  const linkColor = isHighlighted ? COLORS.objectProp : COLORS.linkDefault
+  const linkWidth = isHighlighted ? 2.5 * globalScale : 1.5 * globalScale
+
+  const [ex2, ey2] = lineRectIntersect(sx, sy, tx, ty, sx, sy, shw, shh)
+  const [ex1, ey1] = lineRectIntersect(sx, sy, tx, ty, tx, ty, thw, thh)
+
+  const dx = tx - sx
+  const dy = ty - sy
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1
+  const nx = dx / dist
+  const ny = dy / dist
+
+  const arrowSize = 12 * globalScale
+
+  ctx.save()
+
+  ctx.beginPath()
+  ctx.moveTo(ex2, ey2)
+  ctx.lineTo(ex1, ey1)
+  ctx.strokeStyle = linkColor
+  ctx.lineWidth = linkWidth
+  if (link.type === "inheritance") {
+    ctx.setLineDash([])
+  } else if (link.type === "data") {
+    ctx.setLineDash([6 * globalScale, 4 * globalScale])
+  }
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  if (link.type === "object") {
+    const angle = Math.atan2(dy, dx)
+    ctx.beginPath()
+    ctx.moveTo(ex1, ey1)
+    ctx.lineTo(
+      ex1 - arrowSize * Math.cos(angle - Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle - Math.PI / 7)
+    )
+    ctx.lineTo(
+      ex1 - arrowSize * Math.cos(angle + Math.PI / 7),
+      ey1 - arrowSize * Math.sin(angle + Math.PI / 7)
+    )
+    ctx.closePath()
+    ctx.fillStyle = linkColor
+    ctx.fill()
+  }
+
+  if (link.type === "inheritance") {
+    const propLen = 14 * globalScale
+    const px2 = tx - nx * (thh + propLen)
+    const py2 = ty - ny * (thh + propLen)
+    const perpX = -ny
+    const perpY = nx
+    ctx.beginPath()
+    ctx.moveTo(tx - nx * thh, ty - ny * thh)
+    ctx.lineTo(px2 + perpX * propLen * 0.6, py2 + perpY * propLen * 0.6)
+    ctx.lineTo(px2 - perpX * propLen * 0.6, py2 - perpY * propLen * 0.6)
+    ctx.closePath()
+    ctx.fillStyle = linkColor
+    ctx.fill()
+  }
+
+  const mx = (ex1 + ex2) / 2
+  const my = (ey1 + ey2) / 2
+  const fontSize = Math.max(9, 10 * globalScale)
+  ctx.font = `400 ${fontSize}px Inter, sans-serif`
+  const label = link.type === "inheritance" ? "⊆" : link.displayName
+  const textWidth = ctx.measureText(label).width
+  const pad = 4
+
+  ctx.fillStyle = "rgba(15, 23, 42, 0.9)"
+  ctx.beginPath()
+  ctx.roundRect(mx - textWidth / 2 - pad, my - fontSize / 2 - 2, textWidth + pad * 2, fontSize + 4, 3)
+  ctx.fill()
+
+  ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillText(label, mx, my)
+
+  ctx.restore()
+}
+
+// ============================================================
+// Component
 // ============================================================
 
 interface OntologyGraphProps {
@@ -344,26 +490,23 @@ export default function OntologyGraph({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<ForceGraphMethods<GraphNode, GraphLink>>(null) as any
   const containerRef = useRef<HTMLDivElement>(null)
-  const hoveredIdRef = useRef<string | null>(null) // ref only — avoids re-render → force jitter
+  const hoveredIdRef = useRef<string | null>(null)
   const [dimensions, setDimensions] = useState({ width, height })
-  // Auto-fit on data change
+
   useEffect(() => {
     if (graphRef.current) {
       setTimeout(() => graphRef.current?.zoomToFit(600, 30), 300)
     }
   }, [data])
 
-  // Configure d3 forces after graph mounts
   useEffect(() => {
     if (!graphRef.current) return
-    // Increase repulsion and link distance for better spacing
     graphRef.current.d3Force("charge", d3.forceManyBody().strength(-800).distanceMax(500))
     graphRef.current.d3Force("link", d3.forceLink().distance(250).strength(0.3))
     graphRef.current.d3Force("center", d3.forceCenter(0, 0).strength(0.05))
     graphRef.current.d3ReheatSimulation()
   }, [])
 
-  // Responsive resize
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -379,11 +522,30 @@ export default function OntologyGraph({
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const transform = { x: 0, y: 0, k: globalScale }
-      // Read from ref — never from state — so no re-render triggers
-      renderNodeCanvas(ctx, node, dimensions.width, dimensions.height, transform, selectedClassId ?? null, hoveredIdRef.current)
+      renderNode(ctx, node, globalScale, selectedClassId ?? null, hoveredIdRef.current)
     },
-    [selectedClassId, dimensions]
+    [selectedClassId]
+  )
+
+  const nodePointerAreaPaint = useCallback(
+    (node: any, color: string, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const { w, h, hw, hh } = getNodeDims(node as GraphNode, globalScale)
+      ctx.fillStyle = color
+      ctx.beginPath()
+      roundRect(ctx, (node.x || 0) - hw, (node.y || 0) - hh, w, h, 8 * globalScale)
+      ctx.fill()
+    },
+    []
+  )
+
+  const linkCanvasObject = useCallback(
+    (link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const source = link.source as GraphNode
+      const target = link.target as GraphNode
+      if (!source || !target || source.x == null || target.x == null) return
+      renderLink(ctx, link, source, target, globalScale, selectedClassId ?? null)
+    },
+    [selectedClassId]
   )
 
   const onNodeClick = useCallback(
@@ -395,7 +557,6 @@ export default function OntologyGraph({
 
   const onNodeHover = useCallback(
     (node: NodeObject | null) => {
-      // Update ref only — no React state change, no re-render
       hoveredIdRef.current = node ? (node as GraphNode).id : null
       if (containerRef.current) {
         containerRef.current.style.cursor = node ? "pointer" : "grab"
@@ -416,7 +577,6 @@ export default function OntologyGraph({
         overflow: "hidden",
       }}
     >
-      {/* Grid background */}
       <div
         style={{
           position: "absolute",
@@ -430,7 +590,6 @@ export default function OntologyGraph({
         }}
       />
 
-      {/* Force Graph */}
       <ForceGraph2D
         ref={graphRef}
         graphData={{ nodes, links }}
@@ -438,21 +597,9 @@ export default function OntologyGraph({
         height={dimensions.height}
         backgroundColor="transparent"
         nodeCanvasObject={nodeCanvasObject as any}
-        nodePointerAreaPaint={(node: any, color: string, ctx: CanvasRenderingContext2D) => {
-          const n = node as GraphNode
-          const w = Math.max(140, n.displayName.length * 9 + 80)
-          const headerH = 36
-          const propH = Math.min(5, n.dataProperties?.length || 0) * 18 + 16
-          ctx.fillStyle = color
-          ctx.beginPath()
-          _roundRect(ctx, (n.x || 0) - w / 2, (n.y || 0) - (headerH + propH) / 2, w, headerH + propH, 8)
-          ctx.fill()
-        }}
-        linkDirectionalArrowLength={6}
-        linkDirectionalArrowRelPos={0.9}
-        linkColor={() => "#F59E0B"}
-        linkDirectionalArrowColor={() => "#F59E0B"}
-        linkWidth={2}
+        nodePointerAreaPaint={nodePointerAreaPaint as any}
+        linkCanvasObject={linkCanvasObject as any}
+        linkDirectionalArrowLength={0}
         onNodeClick={onNodeClick}
         onNodeHover={onNodeHover}
         cooldownTicks={150}
@@ -615,9 +762,7 @@ function LegendItem({
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <svg width="24" height="16" style={{ flexShrink: 0 }}>
         {shape === "circle" && (
-          <>
-            <circle cx="12" cy="8" r="6" fill={color} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-          </>
+          <circle cx="12" cy="8" r="6" fill={color} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
         )}
         {shape === "dashed" && (
           <line x1="2" y1="8" x2="22" y2="8" stroke={color} strokeWidth="2" strokeDasharray="4 3" />

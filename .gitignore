@@ -110,3 +110,7 @@ temp/
 tmp/
 *.bak
 *.orig
+
+# Data files
+data/*.json
+!data/.gitkeep

@@ -12,6 +12,45 @@ from src.schemas.ontology import (
     DataRangeResponse,
 )
 
+# Try to import Jena client, fall back gracefully
+try:
+    from src.services.jena_client import (
+        JenaClient,
+        get_jena_client,
+        JenaConnectionError,
+    )
+
+    JENA_AVAILABLE = True
+except ImportError:
+    JENA_AVAILABLE = False
+    JenaClient = None
+    get_jena_client = None
+    JenaConnectionError = Exception
+
+# Global Jena client instance
+_jena_client = None
+
+
+def _get_jena() -> Optional["JenaClient"]:
+    """Get Jena client if available"""
+    global _jena_client
+    if not JENA_AVAILABLE:
+        return None
+    try:
+        if _jena_client is None:
+            _jena_client = get_jena_client()
+        return _jena_client
+    except JenaConnectionError:
+        return None
+
+
+# Ontology IRI mapping (for Jena)
+ONTOLOGY_IRI_MAP = {
+    "1": "http://onto-agent.com/ontology/customer360#",
+    "2": "http://onto-agent.com/ontology/supplier-network#",
+    "3": "http://onto-agent.com/ontology/order全景#",
+}
+
 MOCK_ONTOLOGIES = [
     {
         "id": "1",
@@ -1125,38 +1164,108 @@ ONTOLOGY_DATA: dict[str, dict] = {
 
 
 async def list_ontologies() -> list[OntologyResponse]:
+    jena = _get_jena()
     result = []
+
     for o in MOCK_ONTOLOGIES:
         ontology_id = o["id"]
-        data = ONTOLOGY_DATA.get(
-            ontology_id,
-            {
-                "classes": [],
-                "data_properties": [],
-                "object_properties": [],
-            },
-        )
-        count_data = {
-            **o,
-            "object_count": len(data.get("classes", [])),
-            "data_property_count": len(data.get("data_properties", [])),
-            "object_property_count": len(data.get("object_properties", [])),
-        }
+
+        if jena and ontology_id in ONTOLOGY_IRI_MAP:
+            # Use Jena to get real counts
+            ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+            try:
+                classes = jena.list_classes(ontology_iri)
+                data_props = jena.list_datatype_properties(ontology_iri)
+                obj_props = jena.list_object_properties(ontology_iri)
+                count_data = {
+                    **o,
+                    "object_count": len(classes),
+                    "data_property_count": len(data_props),
+                    "object_property_count": len(obj_props),
+                }
+            except Exception:
+                # Fall back to mock data
+                data = ONTOLOGY_DATA.get(
+                    ontology_id,
+                    {"classes": [], "data_properties": [], "object_properties": []},
+                )
+                count_data = {
+                    **o,
+                    "object_count": len(data.get("classes", [])),
+                    "data_property_count": len(data.get("data_properties", [])),
+                    "object_property_count": len(data.get("object_properties", [])),
+                }
+        else:
+            # Use mock data
+            data = ONTOLOGY_DATA.get(
+                ontology_id,
+                {"classes": [], "data_properties": [], "object_properties": []},
+            )
+            count_data = {
+                **o,
+                "object_count": len(data.get("classes", [])),
+                "data_property_count": len(data.get("data_properties", [])),
+                "object_property_count": len(data.get("object_properties", [])),
+            }
+
         result.append(OntologyResponse(**count_data))
+
     return result
 
 
 async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
+    jena = _get_jena()
     for o in MOCK_ONTOLOGIES:
         if o["id"] == ontology_id:
+            if jena and ontology_id in ONTOLOGY_IRI_MAP:
+                ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+                try:
+                    classes = jena.list_classes(ontology_iri)
+                    data_props = jena.list_datatype_properties(ontology_iri)
+                    obj_props = jena.list_object_properties(ontology_iri)
+                    return OntologyResponse(
+                        **{
+                            k: v
+                            for k, v in o.items()
+                            if k != "object_count"
+                            and k != "data_property_count"
+                            and k != "object_property_count"
+                        },
+                        object_count=len(classes),
+                        data_property_count=len(data_props),
+                        object_property_count=len(obj_props),
+                    )
+                except Exception:
+                    pass
             return OntologyResponse(**o)
     return None
 
 
 async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
+    jena = _get_jena()
     for o in MOCK_ONTOLOGIES:
         if o["id"] == ontology_id:
             base = OntologyResponse(**o)
+
+            if jena and ontology_id in ONTOLOGY_IRI_MAP:
+                ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+                try:
+                    classes = jena.list_classes(ontology_iri)
+                    data_props = jena.list_datatype_properties(ontology_iri)
+                    obj_props = jena.list_object_properties(ontology_iri)
+                    return OntologyDetailResponse(
+                        **base.model_dump(),
+                        classes=classes,
+                        data_properties=data_props,
+                        object_properties=obj_props,
+                        annotation_properties=[],
+                        individuals=[],
+                        axioms=[],
+                        data_ranges=[],
+                    )
+                except Exception:
+                    pass
+
             data = ONTOLOGY_DATA.get(
                 ontology_id,
                 {
@@ -1194,6 +1303,13 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
 
 
 async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        try:
+            return jena.list_classes(ontology_iri)
+        except Exception:
+            pass
     data = ONTOLOGY_DATA.get(ontology_id, {"classes": []})
     return [OntologyClassResponse(**c) for c in data["classes"]]
 
@@ -1209,6 +1325,24 @@ async def create_ontology_class(
     disjoint_with: list = None,
     super_classes: list = None,
 ) -> OntologyClassResponse:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        super_class_iris = [
+            f"{ONTOLOGY_IRI_MAP.get(ontology_id, '')}{sc}"
+            for sc in (super_classes or [])
+        ]
+        try:
+            return jena.create_class(
+                ontology_iri=ontology_iri,
+                name=name,
+                display_name=display_name,
+                description=description,
+                super_classes=super_class_iris if super_class_iris else None,
+            )
+        except Exception:
+            pass
+
     new_class = {
         "id": name,
         "ontology_id": ontology_id,
@@ -1240,6 +1374,13 @@ def _init_ontology_data(ontology_id: str):
 
 
 async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        try:
+            return jena.list_datatype_properties(ontology_iri)
+        except Exception:
+            pass
     data = ONTOLOGY_DATA.get(ontology_id, {"data_properties": []})
     return [DataPropertyResponse(**p) for p in data["data_properties"]]
 
@@ -1254,6 +1395,23 @@ async def create_data_property(
     characteristics: list = None,
     super_property_id: str = None,
 ) -> DataPropertyResponse:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        if domain_ids:
+            domain_iri = f"{ontology_iri}{domain_ids[0]}"
+            try:
+                return jena.create_datatype_property(
+                    ontology_iri=ontology_iri,
+                    name=name,
+                    domain_iri=domain_iri,
+                    range_type=range_type,
+                    display_name=display_name,
+                    characteristics=characteristics,
+                )
+            except Exception:
+                pass
+
     new_prop = {
         "id": f"dp-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('data_properties', [])) + 1}",
         "ontology_id": ontology_id,
@@ -1274,6 +1432,13 @@ async def create_data_property(
 
 
 async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        try:
+            return jena.list_object_properties(ontology_iri)
+        except Exception:
+            pass
     data = ONTOLOGY_DATA.get(ontology_id, {"object_properties": []})
     return [ObjectPropertyResponse(**p) for p in data["object_properties"]]
 
@@ -1290,6 +1455,27 @@ async def create_object_property(
     inverse_of_id: str = None,
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
+    jena = _get_jena()
+    if jena and ontology_id in ONTOLOGY_IRI_MAP:
+        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+        if domain_ids and range_ids:
+            domain_iri = f"{ontology_iri}{domain_ids[0]}"
+            range_iri = f"{ontology_iri}{range_ids[0]}"
+            try:
+                return jena.create_object_property(
+                    ontology_iri=ontology_iri,
+                    name=name,
+                    domain_iri=domain_iri,
+                    range_iri=range_iri,
+                    display_name=display_name,
+                    characteristics=characteristics,
+                    inverse_of=f"{ontology_iri}{inverse_of_id}"
+                    if inverse_of_id
+                    else None,
+                )
+            except Exception:
+                pass
+
     new_prop = {
         "id": f"op-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('object_properties', [])) + 1}",
         "ontology_id": ontology_id,

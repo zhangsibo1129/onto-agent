@@ -1427,23 +1427,23 @@ async def create_ontology_class(
     disjoint_with: list = None,
     super_classes: list = None,
 ) -> OntologyClassResponse:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-        super_class_iris = [
-            f"{ONTOLOGY_IRI_MAP.get(ontology_id, '')}{sc}"
-            for sc in (super_classes or [])
-        ]
-        try:
-            return jena.create_class(
-                ontology_iri=ontology_iri,
-                name=name,
-                display_name=display_name,
-                description=description,
-                super_classes=super_class_iris if super_class_iris else None,
-            )
-        except Exception:
-            pass
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+
+    if meta:
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena:
+            super_class_iris = [f"{meta.base_iri}{sc}" for sc in (super_classes or [])]
+            try:
+                return jena.create_class(
+                    ontology_iri=meta.base_iri,
+                    name=name,
+                    display_name=display_name,
+                    description=description,
+                    super_classes=super_class_iris if super_class_iris else None,
+                )
+            except Exception:
+                pass
 
     new_class = {
         "id": name,
@@ -1476,13 +1476,15 @@ def _init_ontology_data(ontology_id: str):
 
 
 async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-        try:
-            return jena.list_datatype_properties(ontology_iri)
-        except Exception:
-            pass
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if meta:
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena:
+            try:
+                return jena.list_datatype_properties(meta.base_iri)
+            except Exception:
+                pass
     data = ONTOLOGY_DATA.get(ontology_id, {"data_properties": []})
     return [DataPropertyResponse(**p) for p in data["data_properties"]]
 
@@ -1497,14 +1499,16 @@ async def create_data_property(
     characteristics: list = None,
     super_property_id: str = None,
 ) -> DataPropertyResponse:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-        if domain_ids:
-            domain_iri = f"{ontology_iri}{domain_ids[0]}"
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+
+    if meta:
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena and domain_ids:
+            domain_iri = f"{meta.base_iri}{domain_ids[0]}"
             try:
                 return jena.create_datatype_property(
-                    ontology_iri=ontology_iri,
+                    ontology_iri=meta.base_iri,
                     name=name,
                     domain_iri=domain_iri,
                     range_type=range_type,
@@ -1534,13 +1538,15 @@ async def create_data_property(
 
 
 async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-        try:
-            return jena.list_object_properties(ontology_iri)
-        except Exception:
-            pass
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if meta:
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena:
+            try:
+                return jena.list_object_properties(meta.base_iri)
+            except Exception:
+                pass
     data = ONTOLOGY_DATA.get(ontology_id, {"object_properties": []})
     return [ObjectPropertyResponse(**p) for p in data["object_properties"]]
 
@@ -1557,21 +1563,23 @@ async def create_object_property(
     inverse_of_id: str = None,
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-        if domain_ids and range_ids:
-            domain_iri = f"{ontology_iri}{domain_ids[0]}"
-            range_iri = f"{ontology_iri}{range_ids[0]}"
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+
+    if meta:
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena and domain_ids and range_ids:
+            domain_iri = f"{meta.base_iri}{domain_ids[0]}"
+            range_iri = f"{meta.base_iri}{range_ids[0]}"
             try:
                 return jena.create_object_property(
-                    ontology_iri=ontology_iri,
+                    ontology_iri=meta.base_iri,
                     name=name,
                     domain_iri=domain_iri,
                     range_iri=range_iri,
                     display_name=display_name,
                     characteristics=characteristics,
-                    inverse_of=f"{ontology_iri}{inverse_of_id}"
+                    inverse_of=f"{meta.base_iri}{inverse_of_id}"
                     if inverse_of_id
                     else None,
                 )

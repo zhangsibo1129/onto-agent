@@ -11,12 +11,14 @@ from src.schemas.ontology import (
     OntologyDetailResponse,
     DataRangeResponse,
 )
+from src.services.ontology_metadata import OntologyMetadata, get_metadata_store
 
 # Try to import Jena client, fall back gracefully
 try:
     from src.services.jena_client import (
         JenaClient,
         get_jena_client,
+        get_jena_client_for_dataset,
         JenaConnectionError,
     )
 
@@ -25,6 +27,7 @@ except ImportError:
     JENA_AVAILABLE = False
     JenaClient = None
     get_jena_client = None
+    get_jena_client_for_dataset = None
     JenaConnectionError = Exception
 
 # Global Jena client instance
@@ -1164,154 +1167,235 @@ ONTOLOGY_DATA: dict[str, dict] = {
 
 
 async def list_ontologies() -> list[OntologyResponse]:
-    jena = _get_jena()
+    metadata_store = get_metadata_store()
     result = []
 
-    for o in MOCK_ONTOLOGIES:
-        ontology_id = o["id"]
-
-        if jena and ontology_id in ONTOLOGY_IRI_MAP:
-            # Use Jena to get real counts
-            ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+    for meta in metadata_store.list_all():
+        jena = get_jena_client_for_dataset(meta.dataset)
+        if jena:
             try:
-                classes = jena.list_classes(ontology_iri)
-                data_props = jena.list_datatype_properties(ontology_iri)
-                obj_props = jena.list_object_properties(ontology_iri)
-                count_data = {
-                    **o,
-                    "object_count": len(classes),
-                    "data_property_count": len(data_props),
-                    "object_property_count": len(obj_props),
-                }
+                classes = jena.list_classes(meta.base_iri)
+                data_props = jena.list_datatype_properties(meta.base_iri)
+                obj_props = jena.list_object_properties(meta.base_iri)
             except Exception:
-                # Fall back to mock data
-                data = ONTOLOGY_DATA.get(
-                    ontology_id,
-                    {"classes": [], "data_properties": [], "object_properties": []},
-                )
-                count_data = {
-                    **o,
-                    "object_count": len(data.get("classes", [])),
-                    "data_property_count": len(data.get("data_properties", [])),
-                    "object_property_count": len(data.get("object_properties", [])),
-                }
+                classes = []
+                data_props = []
+                obj_props = []
         else:
-            # Use mock data
-            data = ONTOLOGY_DATA.get(
-                ontology_id,
-                {"classes": [], "data_properties": [], "object_properties": []},
-            )
-            count_data = {
-                **o,
-                "object_count": len(data.get("classes", [])),
-                "data_property_count": len(data.get("data_properties", [])),
-                "object_property_count": len(data.get("object_properties", [])),
-            }
+            classes = []
+            data_props = []
+            obj_props = []
 
-        result.append(OntologyResponse(**count_data))
+        result.append(
+            OntologyResponse(
+                id=meta.id,
+                name=meta.name,
+                description=meta.description,
+                version=meta.version,
+                status=meta.status,
+                datasource=None,
+                base_iri=meta.base_iri,
+                imports=[],
+                prefix_mappings={
+                    "owl": "http://www.w3.org/2002/07/owl#",
+                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                    "xsd": "http://www.w3.org/2001/XMLSchema#",
+                },
+                object_count=len(classes),
+                data_property_count=len(data_props),
+                object_property_count=len(obj_props),
+                individual_count=0,
+                axiom_count=0,
+                created_at=meta.created_at,
+                updated_at=meta.updated_at,
+            )
+        )
 
     return result
 
 
+async def create_ontology(
+    name: str,
+    description: str = None,
+    base_iri: str = None,
+    imports: list = None,
+    prefix_mappings: dict = None,
+) -> OntologyResponse:
+    metadata_store = get_metadata_store()
+
+    new_id = metadata_store.generate_id()
+
+    if not base_iri:
+        base_iri = f"http://onto-agent.com/ontology/{name}#"
+
+    now = datetime.utcnow().isoformat() + "Z"
+    dataset = metadata_store.generate_dataset(new_id)
+
+    jena = get_jena_client()
+    if jena:
+        try:
+            jena.create_dataset(dataset)
+        except Exception as e:
+            print(f"Warning: Failed to create dataset {dataset}: {e}")
+
+    jena_for_new = get_jena_client_for_dataset(dataset)
+    if jena_for_new:
+        try:
+            jena_for_new.create_ontology(
+                name=name, base_iri=base_iri, description=description
+            )
+        except Exception as e:
+            print(f"Warning: Failed to create ontology in dataset: {e}")
+
+    metadata = OntologyMetadata(
+        id=new_id,
+        name=name,
+        base_iri=base_iri,
+        dataset=dataset,
+        description=description or "",
+        version="v1.0",
+        status="draft",
+        created_at=now,
+        updated_at=now,
+    )
+    metadata_store.add(metadata)
+
+    return OntologyResponse(
+        id=new_id,
+        name=name,
+        description=description or "",
+        version="v1.0",
+        status="draft",
+        datasource=None,
+        base_iri=base_iri,
+        imports=imports or [],
+        prefix_mappings=prefix_mappings
+        or {
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=0,
+        data_property_count=0,
+        object_property_count=0,
+        individual_count=0,
+        axiom_count=0,
+        created_at=now,
+        updated_at=now,
+    )
+
+
 async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
-    jena = _get_jena()
-    for o in MOCK_ONTOLOGIES:
-        if o["id"] == ontology_id:
-            if jena and ontology_id in ONTOLOGY_IRI_MAP:
-                ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-                try:
-                    classes = jena.list_classes(ontology_iri)
-                    data_props = jena.list_datatype_properties(ontology_iri)
-                    obj_props = jena.list_object_properties(ontology_iri)
-                    return OntologyResponse(
-                        **{
-                            k: v
-                            for k, v in o.items()
-                            if k != "object_count"
-                            and k != "data_property_count"
-                            and k != "object_property_count"
-                        },
-                        object_count=len(classes),
-                        data_property_count=len(data_props),
-                        object_property_count=len(obj_props),
-                    )
-                except Exception:
-                    pass
-            return OntologyResponse(**o)
-    return None
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if not meta:
+        return None
+
+    jena = get_jena_client_for_dataset(meta.dataset)
+    if jena:
+        try:
+            classes = jena.list_classes(meta.base_iri)
+            data_props = jena.list_datatype_properties(meta.base_iri)
+            obj_props = jena.list_object_properties(meta.base_iri)
+        except Exception:
+            classes = []
+            data_props = []
+            obj_props = []
+    else:
+        classes = []
+        data_props = []
+        obj_props = []
+
+    return OntologyResponse(
+        id=meta.id,
+        name=meta.name,
+        description=meta.description,
+        version=meta.version,
+        status=meta.status,
+        datasource=None,
+        base_iri=meta.base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=len(classes),
+        data_property_count=len(data_props),
+        object_property_count=len(obj_props),
+        individual_count=0,
+        axiom_count=0,
+        created_at=meta.created_at,
+        updated_at=meta.updated_at,
+    )
 
 
 async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
-    jena = _get_jena()
-    for o in MOCK_ONTOLOGIES:
-        if o["id"] == ontology_id:
-            base = OntologyResponse(**o)
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if not meta:
+        return None
 
-            if jena and ontology_id in ONTOLOGY_IRI_MAP:
-                ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
-                try:
-                    classes = jena.list_classes(ontology_iri)
-                    data_props = jena.list_datatype_properties(ontology_iri)
-                    obj_props = jena.list_object_properties(ontology_iri)
-                    return OntologyDetailResponse(
-                        **base.model_dump(),
-                        classes=classes,
-                        data_properties=data_props,
-                        object_properties=obj_props,
-                        annotation_properties=[],
-                        individuals=[],
-                        axioms=[],
-                        data_ranges=[],
-                    )
-                except Exception:
-                    pass
+    jena = get_jena_client_for_dataset(meta.dataset)
 
-            data = ONTOLOGY_DATA.get(
-                ontology_id,
-                {
-                    "classes": [],
-                    "data_properties": [],
-                    "object_properties": [],
-                    "annotation_properties": [],
-                    "individuals": [],
-                    "axioms": [],
-                    "data_ranges": [],
-                },
-            )
-            return OntologyDetailResponse(
-                **base.model_dump(),
-                classes=[OntologyClassResponse(**c) for c in data["classes"]],
-                data_properties=[
-                    DataPropertyResponse(**p) for p in data["data_properties"]
-                ],
-                object_properties=[
-                    ObjectPropertyResponse(**p) for p in data["object_properties"]
-                ],
-                annotation_properties=[
-                    AnnotationPropertyResponse(**p)
-                    for p in data.get("annotation_properties", [])
-                ],
-                individuals=[
-                    IndividualResponse(**i) for i in data.get("individuals", [])
-                ],
-                axioms=[AxiomResponse(**a) for a in data.get("axioms", [])],
-                data_ranges=[
-                    DataRangeResponse(**d) for d in data.get("data_ranges", [])
-                ],
-            )
-    return None
+    if jena:
+        try:
+            classes = jena.list_classes(meta.base_iri)
+            data_props = jena.list_datatype_properties(meta.base_iri)
+            obj_props = jena.list_object_properties(meta.base_iri)
+        except Exception:
+            classes = []
+            data_props = []
+            obj_props = []
+    else:
+        classes = []
+        data_props = []
+        obj_props = []
+
+    return OntologyDetailResponse(
+        id=meta.id,
+        name=meta.name,
+        description=meta.description,
+        version=meta.version,
+        status=meta.status,
+        datasource=None,
+        base_iri=meta.base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=len(classes),
+        data_property_count=len(data_props),
+        object_property_count=len(obj_props),
+        individual_count=0,
+        axiom_count=0,
+        created_at=meta.created_at,
+        updated_at=meta.updated_at,
+        classes=classes,
+        data_properties=data_props,
+        object_properties=obj_props,
+        annotation_properties=[],
+        individuals=[],
+        axioms=[],
+        data_ranges=[],
+    )
 
 
 async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
-    jena = _get_jena()
-    if jena and ontology_id in ONTOLOGY_IRI_MAP:
-        ontology_iri = ONTOLOGY_IRI_MAP[ontology_id]
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if not meta:
+        return []
+
+    jena = get_jena_client_for_dataset(meta.dataset)
+    if jena:
         try:
-            return jena.list_classes(ontology_iri)
+            return jena.list_classes(meta.base_iri)
         except Exception:
             pass
-    data = ONTOLOGY_DATA.get(ontology_id, {"classes": []})
-    return [OntologyClassResponse(**c) for c in data["classes"]]
+    return []
 
 
 async def create_ontology_class(

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { ontologyApi, type Ontology } from "@/services/ontologyApi"
+import { ontologyApi, type Ontology, type CreateOntologyDto } from "@/services/ontologyApi"
+import { Modal, Button } from "@/components/ui"
 import "./Ontologies.css"
 
 const colorMap: Record<number, { bg: string; color: string }> = {
@@ -36,6 +37,14 @@ export default function Ontologies() {
   const [ontologies, setOntologies] = useState<Ontology[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("全部状态")
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
+
+  const [formData, setFormData] = useState<CreateOntologyDto>({
+    name: "",
+    description: "",
+    baseIri: "http://onto-agent.com/ontology/",
+  })
 
   useEffect(() => {
     ontologyApi.list()
@@ -57,6 +66,34 @@ export default function Ontologies() {
     e.stopPropagation()
     if (!confirm("确定要删除这个本体吗？")) return
     alert(`删除本体 ${id} 功能开发中`)
+  }
+
+  const handleCreateOntology = async () => {
+    if (!formData.name.trim() || !formData.baseIri.trim()) {
+      alert("请填写必填项")
+      return
+    }
+
+    setCreateLoading(true)
+    try {
+      const newOntology = await ontologyApi.createOntology(formData)
+      setOntologies((prev) => [...prev, newOntology])
+      setShowCreateModal(false)
+      setFormData({ name: "", description: "", baseIri: "http://onto-agent.com/ontology/" })
+    } catch (err) {
+      console.error("创建本体失败:", err)
+      alert("创建本体失败")
+    } finally {
+      setCreateLoading(false)
+    }
+  }
+
+  const handleAutoGenerateIri = () => {
+    const slug = formData.name.trim() || "ontology"
+    setFormData((prev) => ({
+      ...prev,
+      baseIri: `http://onto-agent.com/ontology/${slug}#`,
+    }))
   }
 
   return (
@@ -90,7 +127,7 @@ export default function Ontologies() {
               {publishedCount}/{ontologies.length}
             </span>
           </span>
-          <button className="btn btn-primary btn-sm" onClick={() => alert("创建本体功能开发中...")}>+ 添加本体</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>+ 添加本体</button>
         </div>
       </div>
 
@@ -140,6 +177,64 @@ export default function Ontologies() {
           </div>
         ))}
       </div>
+
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="创建本体"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateOntology} disabled={createLoading}>
+              {createLoading ? "创建中..." : "创建"}
+            </Button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label className="form-label">
+            本体名称 <span className="required">*</span>
+          </label>
+          <input
+            type="text"
+            className="form-input"
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            placeholder="输入本体名称"
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">描述</label>
+          <textarea
+            className="form-textarea"
+            value={formData.description}
+            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+            placeholder="输入本体描述"
+            rows={3}
+          />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">
+            Base IRI <span className="required">*</span>
+          </label>
+          <div className="input-with-button">
+            <input
+              type="text"
+              className="form-input"
+              value={formData.baseIri}
+              onChange={(e) => setFormData((prev) => ({ ...prev, baseIri: e.target.value }))}
+              placeholder="http://example.com/ontology/"
+            />
+            <Button variant="secondary" size="sm" onClick={handleAutoGenerateIri}>
+              自动生成
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

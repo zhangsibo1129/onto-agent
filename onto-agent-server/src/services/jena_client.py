@@ -8,6 +8,7 @@ as the backend RDF store with SPARQL protocol support.
 from typing import Optional
 from functools import lru_cache
 from os import getenv
+from dotenv import load_dotenv
 import httpx
 from rdflib import Graph, Namespace, URIRef, Literal, ConjunctiveGraph
 from rdflib.namespace import RDF, RDFS, OWL
@@ -20,6 +21,10 @@ from src.schemas.ontology import (
     OntologyDetailResponse,
 )
 
+load_dotenv()
+
+# ============================================================================
+# Fuseki Configuration
 # ============================================================================
 # Fuseki Configuration
 # ============================================================================
@@ -129,6 +134,55 @@ class JenaClient:
         except Exception as e:
             raise JenaConnectionError(f"Cannot connect to Fuseki: {e}")
 
+    def create_dataset(self, dataset: str) -> bool:
+        """Create a new dataset in Fuseki"""
+        try:
+            response = httpx.post(
+                f"{self.fuseki_url}/$/datasets",
+                data=f"dbName={dataset.lstrip('/')}&dbType=tdb2",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                auth=self._get_auth(),
+                timeout=self.timeout,
+            )
+            return response.status_code in (200, 201)
+        except Exception as e:
+            raise JenaServiceError(f"Failed to create dataset {dataset}: {e}")
+
+    def delete_dataset(self, dataset: str) -> bool:
+        """Delete a dataset from Fuseki"""
+        try:
+            response = httpx.delete(
+                f"{self.fuseki_url}/$/datasets/{dataset.lstrip('/')}",
+                auth=self._get_auth(),
+                timeout=self.timeout,
+            )
+            return response.status_code in (200, 204)
+        except Exception as e:
+            raise JenaServiceError(f"Failed to delete dataset {dataset}: {e}")
+
+    def list_datasets(self) -> list[dict]:
+        """List all datasets in Fuseki"""
+        try:
+            response = httpx.get(
+                f"{self.fuseki_url}/$/datasets",
+                auth=self._get_auth(),
+                timeout=self.timeout,
+            )
+            if response.status_code == 200:
+                return response.json().get("datasets", [])
+            return []
+        except Exception:
+            return []
+
+    def switch_dataset(self, dataset: str) -> "JenaClient":
+        """Return a new JenaClient instance with different dataset"""
+        return JenaClient(
+            fuseki_url=self.fuseki_url,
+            dataset=dataset,
+            username=self.username,
+            password=self.password,
+        )
+
     def _sparql_update(self, query: str) -> bool:
         """Execute SPARQL Update query"""
         try:
@@ -216,6 +270,62 @@ class JenaClient:
             )
 
         return classes
+
+    def list_ontologies(self) -> list[dict]:
+        """
+        List all ontologies in the dataset
+
+        SPARQL:
+        SELECT ?ontology WHERE {
+            ?ontology a owl:Ontology .
+        }
+        """
+        query = """
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        
+        SELECT DISTINCT ?ontology ?label ?comment
+        WHERE {
+            ?ontology a owl:Ontology .
+            OPTIONAL { ?ontology rdfs:label ?label }
+            OPTIONAL { ?ontology rdfs:comment ?comment }
+        }
+        """
+
+        results = self._sparql_query(query)
+        ontologies = []
+
+        for row in results:
+            ontology_uri = row.get("ontology", {}).get("value", "")
+            label = row.get("label", {}).get("value", "")
+            comment = row.get("comment", {}).get("value", "")
+
+            ontologies.append(
+                {
+                    "base_iri": ontology_uri,
+                    "name": label or self._get_local_name(ontology_uri),
+                    "description": comment or "",
+                }
+            )
+
+        return ontologies
+
+    def create_ontology(
+        self,
+        name: str,
+        base_iri: str,
+        description: Optional[str] = None,
+    ) -> bool:
+        """Create a new owl:Ontology"""
+        triples = [
+            (base_iri, RDF.type, OWL.Ontology),
+            (base_iri, RDFS.label, Literal(name)),
+        ]
+
+        if description:
+            triples.append((base_iri, RDFS.comment, Literal(description)))
+
+        return self._add_triples(triples)
 
     def create_class(
         self,
@@ -679,3 +789,14 @@ def get_jena_client(
         )
 
     return _jena_client
+
+
+def get_jena_client_for_dataset(dataset: str) -> JenaClient:
+    """Get a JenaClient for a specific dataset"""
+    settings = get_fuseki_settings()
+    return JenaClient(
+        fuseki_url=settings["fuseki_url"],
+        dataset=dataset,
+        username=settings["username"],
+        password=settings["password"],
+    )

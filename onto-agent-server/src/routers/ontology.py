@@ -1,6 +1,7 @@
 from typing import Any
 from fastapi import APIRouter, HTTPException
 from src.schemas.ontology import (
+    OntologyCreate,
     OntologyClassCreate,
     DataPropertyCreate,
     ObjectPropertyCreate,
@@ -22,6 +23,18 @@ def success_response(data: Any):
 async def list_ontologies():
     ontologies = await ontology_service.list_ontologies()
     return success_response([o.model_dump() for o in ontologies])
+
+
+@router.post("")
+async def create_ontology(data: OntologyCreate):
+    new_ontology = await ontology_service.create_ontology(
+        name=data.name,
+        description=data.description,
+        base_iri=data.base_iri,
+        imports=data.imports,
+        prefix_mappings=data.prefix_mappings,
+    )
+    return success_response(new_ontology.model_dump())
 
 
 @router.get("/{ontology_id}")

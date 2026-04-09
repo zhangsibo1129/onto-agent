@@ -337,6 +337,12 @@ export interface OntologyDetail extends Ontology {
   dataRanges: DataRange[]
 }
 
+export interface CreateOntologyDto {
+  name: string
+  description?: string
+  baseIri: string
+}
+
 // ============================================================
 // API Methods
 // ============================================================
@@ -346,6 +352,11 @@ export const ontologyApi = {
   list: () => request<Ontology[]>("/ontologies"),
   get: (id: string) => request<Ontology>(`/ontologies/${id}`),
   getDetail: (id: string) => request<OntologyDetail>(`/ontologies/${id}/detail`),
+  createOntology: (dto: CreateOntologyDto) =>
+    request<Ontology>("/ontologies", {
+      method: "POST",
+      body: JSON.stringify(dto),
+    }),
 
   // Classes
   getClasses: (ontologyId: string) =>

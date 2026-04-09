@@ -19,7 +19,8 @@ class CamelCaseJSONResponse(JSONResponse):
 
         import json
 
-        return json.dumps(convert_keys(content), ensure_ascii=False).encode("utf-8")
+        converted = convert_keys(content)
+        return json.dumps(converted, ensure_ascii=False).encode("utf-8")
 
 
 @asynccontextmanager

@@ -474,10 +474,6 @@ export default function OntologyModeling() {
                     </div>
                   </div>
                 )}
-
-                <div className="panel-footer-actions">
-                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal("dataProperty")}>+ 属性</button>
-                </div>
               </div>
             </>
           )}

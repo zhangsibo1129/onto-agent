@@ -182,7 +182,7 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 340px;
+  width: 255px;
   max-height: calc(100% - 24px);
   background: rgba(15, 23, 42, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -208,7 +208,7 @@
   position: absolute;
   top: 12px;
   left: 12px;
-  width: 300px;
+  width: 225px;
   max-height: calc(100% - 24px);
   background: rgba(15, 23, 42, 0.98);
   border: 1px solid rgba(245, 158, 11, 0.3);
@@ -316,12 +316,12 @@
 }
 
 .basic-label {
-  font-size: 10px;
+  font-size: 12px;
   color: #64748B;
 }
 
 .basic-value {
-  font-size: 10px;
+  font-size: 12px;
   color: #CBD5E1;
 }
 
@@ -333,7 +333,7 @@
 
 .basic-value.url {
   font-family: "SF Mono", "Fira Code", monospace;
-  font-size: 9px;
+  font-size: 11px;
   color: #64748B;
   word-break: break-all;
 }
@@ -350,7 +350,7 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   padding: 4px 0;
-  font-size: 10px;
+  font-size: 12px;
   align-items: center;
 }
 
@@ -380,7 +380,7 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
   padding: 4px 0;
-  font-size: 10px;
+  font-size: 12px;
   align-items: center;
 }
 
@@ -482,7 +482,7 @@
 
 /* Empty State */
 .empty-text {
-  font-size: 10px;
+  font-size: 12px;
   color: #475569;
   padding: 6px 0;
 }

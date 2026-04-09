@@ -1125,7 +1125,25 @@ ONTOLOGY_DATA: dict[str, dict] = {
 
 
 async def list_ontologies() -> list[OntologyResponse]:
-    return [OntologyResponse(**o) for o in MOCK_ONTOLOGIES]
+    result = []
+    for o in MOCK_ONTOLOGIES:
+        ontology_id = o["id"]
+        data = ONTOLOGY_DATA.get(
+            ontology_id,
+            {
+                "classes": [],
+                "data_properties": [],
+                "object_properties": [],
+            },
+        )
+        count_data = {
+            **o,
+            "object_count": len(data.get("classes", [])),
+            "data_property_count": len(data.get("data_properties", [])),
+            "object_property_count": len(data.get("object_properties", [])),
+        }
+        result.append(OntologyResponse(**count_data))
+    return result
 
 
 async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:

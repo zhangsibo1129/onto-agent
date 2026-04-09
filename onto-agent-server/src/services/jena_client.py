@@ -35,7 +35,6 @@ def get_fuseki_settings() -> dict:
     """Load Fuseki settings from environment variables"""
     return {
         "fuseki_url": getenv("FUSEKI_URL", "http://localhost:3030"),
-        "dataset": getenv("FUSEKI_DATASET", "/onto"),
         "username": getenv("FUSEKI_USER", "admin"),
         "password": getenv("FUSEKI_PASSWORD", ""),
     }
@@ -783,7 +782,7 @@ def get_jena_client(
 
         _jena_client = JenaClient(
             fuseki_url=fuseki_url or settings["fuseki_url"],
-            dataset=dataset or settings["dataset"],
+            dataset=dataset or "/_admin",  # Used for admin ops only
             username=username or settings["username"],
             password=password or settings["password"],
         )

@@ -377,9 +377,11 @@ class OntologyBase(CamelCaseModel):
 
 
 class OntologyCreate(OntologyBase):
-    base_iri: Optional[str] = None
-    imports: list[str] = Field(default_factory=list)
-    prefix_mappings: dict[str, str] = Field(default_factory=dict)
+    base_iri: Optional[str] = Field(default=None, validation_alias="baseIri")
+    imports: list[str] = Field(default_factory=list, validation_alias="imports")
+    prefix_mappings: dict[str, str] = Field(
+        default_factory=dict, validation_alias="prefixMappings"
+    )
 
 
 class OntologyUpdate(CamelCaseModel):

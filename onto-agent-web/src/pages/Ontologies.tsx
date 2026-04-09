@@ -62,10 +62,16 @@ export default function Ontologies() {
     return matchesSearch && matchesStatus
   })
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
     if (!confirm("确定要删除这个本体吗？")) return
-    alert(`删除本体 ${id} 功能开发中`)
+    try {
+      await ontologyApi.deleteOntology(id)
+      setOntologies((prev) => prev.filter((o) => o.id !== id))
+    } catch (err) {
+      console.error("删除本体失败:", err)
+      alert("删除本体失败")
+    }
   }
 
   const handleCreateOntology = async () => {

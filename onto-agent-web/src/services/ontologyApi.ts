@@ -357,6 +357,10 @@ export const ontologyApi = {
       method: "POST",
       body: JSON.stringify(dto),
     }),
+  deleteOntology: (id: string) =>
+    request<void>(`/ontologies/${id}`, {
+      method: "DELETE",
+    }),
 
   // Classes
   getClasses: (ontologyId: string) =>

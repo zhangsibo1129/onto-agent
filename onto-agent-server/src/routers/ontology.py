@@ -45,6 +45,14 @@ async def get_ontology(ontology_id: str):
     return success_response(ontology.model_dump())
 
 
+@router.delete("/{ontology_id}")
+async def delete_ontology(ontology_id: str):
+    deleted = await ontology_service.delete_ontology(ontology_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Ontology not found")
+    return success_response({"deleted": True})
+
+
 @router.get("/{ontology_id}/detail")
 async def get_ontology_detail(ontology_id: str):
     detail = await ontology_service.get_ontology_detail(ontology_id)

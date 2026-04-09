@@ -1330,6 +1330,24 @@ async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
     )
 
 
+async def delete_ontology(ontology_id: str) -> bool:
+    """Delete an ontology"""
+    metadata_store = get_metadata_store()
+    meta = metadata_store.get(ontology_id)
+    if not meta:
+        return False
+
+    jena = get_jena_client()
+    if jena:
+        try:
+            jena.delete_dataset(meta.dataset)
+        except Exception as e:
+            print(f"Warning: Failed to delete dataset {meta.dataset}: {e}")
+
+    metadata_store.delete(ontology_id)
+    return True
+
+
 async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
     metadata_store = get_metadata_store()
     meta = metadata_store.get(ontology_id)

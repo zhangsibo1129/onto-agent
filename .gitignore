@@ -112,5 +112,5 @@ tmp/
 *.orig
 
 # Data files
-data/*.json
+onto-agent-server/data/*.json
 !data/.gitkeep

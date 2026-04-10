@@ -399,8 +399,17 @@ export const ontologyApi = {
     }),
 
   // Individuals
-  getIndividuals: (ontologyId: string) =>
-    request<Individual[]>(`/ontologies/${ontologyId}/individuals`),
+  getIndividuals: (ontologyId: string, params?: { classId?: string; search?: string }) => {
+    let url = `/ontologies/${ontologyId}/individuals`;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      if (params.classId) searchParams.set('classId', params.classId);
+      if (params.search) searchParams.set('search', params.search);
+      const qs = searchParams.toString();
+      if (qs) url += '?' + qs;
+    }
+    return request<Individual[]>(url);
+  },
   createIndividual: (ontologyId: string, dto: CreateIndividualDto) =>
     request<Individual>(`/ontologies/${ontologyId}/individuals`, {
       method: "POST",

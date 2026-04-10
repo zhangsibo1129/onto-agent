@@ -228,9 +228,17 @@ async def create_annotation_property(ontology_id: str, data: AnnotationPropertyC
 # ==================== 个体管理 ====================
 
 @router.get("/{ontology_id}/individuals")
-async def get_individuals(ontology_id: str):
-    individuals = await ontology_service.get_individuals(ontology_id)
-    return success_response([i.model_dump() for i in individuals])
+async def get_individuals(
+    ontology_id: str,
+    class_id: str = None,
+    search: str = None,
+):
+    individuals = await ontology_service.get_individuals(
+        ontology_id, 
+        class_id=class_id,
+        search=search
+    )
+    return success_response(individuals)
 
 
 @router.post("/{ontology_id}/individuals")

@@ -664,3 +664,164 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+/* ============================================================
+   ABox 实例列表
+   ============================================================ */
+
+/* 实例搜索 */
+.instance-search {
+  margin-bottom: 12px;
+}
+
+.instance-search input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.instance-search input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* 实例计数 */
+.instance-count {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: normal;
+  margin-left: 6px;
+}
+
+/* 实例列表 */
+.instance-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.loading-text {
+  text-align: center;
+  padding: 20px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* IndividualCard 样式 */
+.individual-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.individual-card:hover {
+  background: #f1f5f9;
+  border-color: #6366f1;
+}
+
+.individual-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.individual-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.individual-icon {
+  font-size: 14px;
+}
+
+.individual-display {
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.individual-id {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.individual-delete {
+  padding: 4px 8px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.individual-card:hover .individual-delete {
+  opacity: 1;
+}
+
+.individual-delete:hover {
+  background: #fecaca;
+}
+
+.individual-card-body {
+  font-size: 12px;
+}
+
+.individual-section {
+  margin-bottom: 6px;
+}
+
+.individual-section:last-child {
+  margin-bottom: 0;
+}
+
+.individual-section .section-label {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.individual-assertion {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.assertion-prop {
+  color: #475569;
+  min-width: 80px;
+}
+
+.assertion-value {
+  color: #1e293b;
+  font-family: monospace;
+}
+
+.assertion-target {
+  color: #6366f1;
+  cursor: pointer;
+}
+
+.assertion-target:hover {
+  text-decoration: underline;
+}
+
+.individual-empty {
+  text-align: center;
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+}

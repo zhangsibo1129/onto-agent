@@ -304,15 +304,18 @@ async def get_annotation_properties(ontology_id: str) -> list:
         return []
 
 
-async def get_individuals(ontology_id: str) -> list:
+async def get_individuals(
+    ontology_id: str, class_id: str = None, search: str = None
+) -> list:
     """Individual 列表：从 Jena 读取"""
     base_iri, dataset = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
         jena = get_jena_client_for_dataset(dataset)
-        return jena.list_individuals(base_iri)
-    except Exception:
+        return jena.list_individuals(base_iri, class_id=class_id, search=search)
+    except Exception as e:
+        print(f"[WARN] get_individuals failed: {e}")
         return []
 
 

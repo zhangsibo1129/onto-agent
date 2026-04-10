@@ -721,15 +721,33 @@ class JenaClient:
             for row in results
         ]
 
-    def list_individuals(self, ontology_iri: str) -> list:
+    def list_individuals(
+        self, ontology_iri: str, class_id: str = None, search: str = None
+    ) -> list:
+        # 构建 FILTER 条件
+        filters = []
+        
+        # 按类型筛选
+        if class_id:
+            class_uri = f"{ontology_iri}{class_id}"
+            filters.append(f'FILTER(EXISTS {{ ?ind rdf:type <{class_uri}> }})')
+        
+        # 按名称/标签搜索
+        if search:
+            filters.append(f'FILTER(CONTAINS(LCASE(STR(?label)), LCASE("{search}")))')
+        
+        filter_str = " . " + " . ".join(filters) if filters else ""
+        
         q = f"""
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         SELECT ?ind ?label ?comment WHERE {{
             ?ind a owl:NamedIndividual .
             FILTER(STRSTARTS(STR(?ind), "{ontology_iri}"))
             OPTIONAL {{ ?ind rdfs:label ?label }}
             OPTIONAL {{ ?ind rdfs:comment ?comment }}
+            {filter_str}
         }}
         """
         results = self._query(q)
@@ -737,6 +755,9 @@ class JenaClient:
         for row in results:
             ind_uri = row.get("ind", {}).get("value", "")
             types = self._get_individual_types(ind_uri)
+            data_props = self._get_individual_data_properties(ind_uri)
+            obj_props = self._get_individual_object_properties(ind_uri)
+            
             individuals.append({
                 "id": self._local_name(ind_uri),
                 "ontology_id": self._ontology_id(ind_uri),
@@ -746,10 +767,59 @@ class JenaClient:
                 "types": types,
                 "labels": {},
                 "comments": {},
-                "data_property_assertions": [],
-                "object_property_assertions": [],
+                "data_property_assertions": data_props,
+                "object_property_assertions": obj_props,
             })
         return individuals
+
+    def _get_individual_data_properties(self, ind_uri: str) -> list:
+        """获取 Individual 的数据属性断言"""
+        q = f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        SELECT ?prop ?value WHERE {{
+            <{ind_uri}> ?prop ?value .
+            FILTER(IsLiteral(?value))
+        }}
+        """
+        results = self._query(q)
+        props = []
+        for row in results:
+            prop_uri = row.get("prop", {}).get("value", "")
+            if "#" in prop_uri:
+                prop_name = prop_uri.split("#")[-1]
+            else:
+                prop_name = prop_uri.split("/")[-1]
+            # 跳过 rdf:type
+            if prop_name not in ["type", " NamedIndividual"]:
+                props.append({
+                    "propertyId": prop_name,
+                    "value": str(row.get("value", {}).get("value", ""))
+                })
+        return props
+
+    def _get_individual_object_properties(self, ind_uri: str) -> list:
+        """获取 Individual 的对象属性断言"""
+        q = f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        SELECT ?prop ?target WHERE {{
+            <{ind_uri}> ?prop ?target .
+            FILTER(IsIRI(?target))
+        }}
+        """
+        results = self._query(q)
+        props = []
+        for row in results:
+            prop_uri = row.get("prop", {}).get("value", "")
+            target_uri = row.get("target", {}).get("value", "")
+            if "#" in prop_uri:
+                prop_name = prop_uri.split("#")[-1]
+            else:
+                prop_name = prop_uri.split("/")[-1]
+            props.append({
+                "propertyId": prop_name,
+                "targetIndividualId": self._local_name(target_uri)
+            })
+        return props
 
     # -------------------------------------------------------------------------
     # Full Ontology Detail (batched)

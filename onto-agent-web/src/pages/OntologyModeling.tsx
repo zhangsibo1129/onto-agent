@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { OntologyGraph } from "@/components/ontology"
+import { OntologyGraph, IndividualCard } from "@/components/ontology"
 import type { OntologyGraphData, ObjectProperty as GraphObjectProperty } from "@/components/ontology"
 import {
   ontologyApi,
@@ -8,6 +8,7 @@ import {
   type OntologyClass,
   type DataProperty,
   type ObjectProperty,
+  type Individual,
 } from "@/services/ontologyApi"
 import "./OntologyModeling.css"
 
@@ -48,6 +49,9 @@ export default function OntologyModeling() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedRelation, setSelectedRelation] = useState<GraphObjectProperty | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "dataProperty" | "objectProperty" | null>(null)
+  const [individuals, setIndividuals] = useState<Individual[]>([])
+  const [individualsLoading, setIndividualsLoading] = useState(false)
+  const [individualSearch, setIndividualSearch] = useState("")
 
   useEffect(() => {
     if (!id) return
@@ -63,6 +67,20 @@ export default function OntologyModeling() {
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [id])
+
+  // 加载该类的实例
+  useEffect(() => {
+    if (!id || !selectedClassId) {
+      setIndividuals([])
+      return
+    }
+    setIndividualsLoading(true)
+    ontologyApi
+      .getIndividuals(id, { classId: selectedClassId, search: individualSearch || undefined })
+      .then(setIndividuals)
+      .catch(console.error)
+      .finally(() => setIndividualsLoading(false))
+  }, [id, selectedClassId, individualSearch])
 
   const handleClassSelect = useCallback((classId: string | null) => {
     setSelectedClassId(classId)
@@ -474,6 +492,43 @@ export default function OntologyModeling() {
                     </div>
                   </div>
                 )}
+                {/* 实例列表 - ABox */}
+                <div className="panel-section">
+                  <div className="section-title">
+                    实例
+                    <span className="instance-count">({individuals.length})</span>
+                  </div>
+                  
+                  {/* 搜索框 */}
+                  <div className="instance-search">
+                    <input
+                      type="text"
+                      placeholder="搜索实例..."
+                      value={individualSearch}
+                      onChange={(e) => setIndividualSearch(e.target.value)}
+                    />
+                  </div>
+                  
+                  {/* 实例列表 */}
+                  <div className="instance-list">
+                    {individualsLoading ? (
+                      <div className="loading-text">加载中...</div>
+                    ) : individuals.length > 0 ? (
+                      individuals.map((ind) => (
+                        <IndividualCard
+                          key={ind.id}
+                          individual={ind}
+                          dataProperties={dataProperties}
+                          objectProperties={objectProperties}
+                        />
+                      ))
+                    ) : (
+                      <div className="empty-text">
+                        {individualSearch ? "未找到匹配的实例" : "暂无实例"}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </>
           )}

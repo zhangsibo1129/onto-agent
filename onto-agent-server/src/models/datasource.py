@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy import String, Integer, Text, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
 from src.database import Base
 
 
@@ -11,7 +10,7 @@ class Datasource(Base):
     __tablename__ = "datasources"
 
     id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
+        String(50), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)

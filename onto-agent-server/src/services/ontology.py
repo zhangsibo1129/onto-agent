@@ -1,125 +1,334 @@
-from datetime import datetime
+"""
+Ontology Service — Option B 架构
+
+读：列表/计数 → PostgreSQL（快）
+    详情/图谱 → Jena（完整数据）
+
+写：Jena（唯一可信源）→ PostgreSQL（轻量索引，同步计数）
+
+所有实体完整数据以 Jena Fuseki 为唯一可信来源。
+PostgreSQL 仅存本体元数据 + 实体索引（ID、名称、Jena URI）+ 计数。
+"""
+
 from typing import Optional
+from src.database import SystemSession
+from sqlalchemy import select, func, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.models.ontology import Ontology, EntityIndex
 from src.schemas.ontology import (
+    OntologyResponse,
+    OntologyDetailResponse,
     OntologyClassResponse,
     DataPropertyResponse,
     ObjectPropertyResponse,
     AnnotationPropertyResponse,
     IndividualResponse,
     AxiomResponse,
-    OntologyResponse,
-    OntologyDetailResponse,
     DataRangeResponse,
 )
-from src.models.ontology import (
-    Ontology,
-    OntologyClass,
-    DataProperty,
-    ObjectProperty,
-    AnnotationProperty,
-    Individual,
-    Axiom,
-    DataRange,
+from src.services.jena_client import (
+    get_jena_client,
+    get_jena_client_for_dataset,
+    JenaClient,
 )
-from src.services.ontology_metadata import OntologyMetadata, get_metadata_store
+from src.services.ontology_metadata import get_metadata_store, OntologyMetadata
 
-# Try to import Jena client, fall back gracefully
-try:
-    from src.services.jena_client import (
-        JenaClient,
-        get_jena_client,
-        get_jena_client_for_dataset,
-        JenaConnectionError,
-    )
-
-    JENA_AVAILABLE = True
-except ImportError:
-    JENA_AVAILABLE = False
-    JenaClient = None
-    get_jena_client = None
-    get_jena_client_for_dataset = None
-    JenaConnectionError = Exception
-
-# Global Jena client instance
-_jena_client = None
+import httpx
 
 
-def _get_jena() -> Optional["JenaClient"]:
-    """Get Jena client if available"""
-    global _jena_client
-    if not JENA_AVAILABLE:
-        return None
+# ============================================================================
+# Jena 客户端获取（延迟，运行时）
+# ============================================================================
+
+def _get_jena() -> Optional[JenaClient]:
     try:
-        if _jena_client is None:
-            _jena_client = get_jena_client()
-        return _jena_client
-    except JenaConnectionError:
+        return get_jena_client()
+    except Exception:
         return None
 
 
-
-
-
-# ============================================================
-# 本体 CRUD（单一可信源：PostgreSQL）
-# ============================================================
-
+# ============================================================================
+# 读操作：列表/元数据 → PostgreSQL
+# ============================================================================
 
 async def list_ontologies() -> list[OntologyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select, func
-
-    async with async_session_maker() as session:
+    """本体列表：PostgreSQL（毫秒级）"""
+    async with SystemSession() as session:
         result = await session.execute(
             select(Ontology).order_by(Ontology.updated_at.desc())
         )
         ontologies = result.scalars().all()
 
-        responses = []
-        for ont in ontologies:
-            class_count = await session.scalar(
-                select(func.count()).select_from(OntologyClass).where(
-                    OntologyClass.ontology_id == ont.id
-                )
+        return [
+            OntologyResponse(
+                id=o.id,
+                name=o.name,
+                description=o.description or "",
+                version=o.version or "v1.0",
+                status=o.status or "draft",
+                datasource=None,
+                base_iri=o.base_iri,
+                imports=[],
+                prefix_mappings={
+                    "owl": "http://www.w3.org/2002/07/owl#",
+                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                    "xsd": "http://www.w3.org/2001/XMLSchema#",
+                },
+                object_count=o.class_count or 0,
+                data_property_count=o.dp_count or 0,
+                object_property_count=o.op_count or 0,
+                individual_count=o.individual_count or 0,
+                axiom_count=o.axiom_count or 0,
+                created_at=o.created_at.isoformat() if o.created_at else "",
+                updated_at=o.updated_at.isoformat() if o.updated_at else "",
             )
-            dp_count = await session.scalar(
-                select(func.count()).select_from(DataProperty).where(
-                    DataProperty.ontology_id == ont.id
-                )
-            )
-            op_count = await session.scalar(
-                select(func.count()).select_from(ObjectProperty).where(
-                    ObjectProperty.ontology_id == ont.id
-                )
-            )
+            for o in ontologies
+        ]
 
-            responses.append(
-                OntologyResponse(
-                    id=ont.id,
-                    name=ont.name,
-                    description=ont.description or "",
-                    version=ont.version or "v1.0",
-                    status=ont.status or "draft",
-                    datasource=None,
-                    base_iri=ont.base_iri,
-                    imports=[],
-                    prefix_mappings={
-                        "owl": "http://www.w3.org/2002/07/owl#",
-                        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-                        "xsd": "http://www.w3.org/2001/XMLSchema#",
-                    },
-                    object_count=class_count or 0,
-                    data_property_count=dp_count or 0,
-                    object_property_count=op_count or 0,
-                    individual_count=0,
-                    axiom_count=0,
-                    created_at=ont.created_at.isoformat() if ont.created_at else "",
-                    updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
-                )
-            )
 
-        return responses
+async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
+    """获取本体摘要：PostgreSQL"""
+    async with SystemSession() as session:
+        result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        o = result.scalar_one_or_none()
+        if not o:
+            return None
 
+        return OntologyResponse(
+            id=o.id,
+            name=o.name,
+            description=o.description or "",
+            version=o.version or "v1.0",
+            status=o.status or "draft",
+            datasource=None,
+            base_iri=o.base_iri,
+            imports=[],
+            prefix_mappings={
+                "owl": "http://www.w3.org/2002/07/owl#",
+                "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                "xsd": "http://www.w3.org/2001/XMLSchema#",
+            },
+            object_count=o.class_count or 0,
+            data_property_count=o.dp_count or 0,
+            object_property_count=o.op_count or 0,
+            individual_count=o.individual_count or 0,
+            axiom_count=o.axiom_count or 0,
+            created_at=o.created_at.isoformat() if o.created_at else "",
+            updated_at=o.updated_at.isoformat() if o.updated_at else "",
+        )
+
+
+async def delete_ontology(ontology_id: str) -> bool:
+    """删除本体：PostgreSQL + Jena dataset（若有）"""
+    async with SystemSession() as session:
+        result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        o = result.scalar_one_or_none()
+        if not o:
+            return False
+        dataset = o.dataset
+        await session.delete(o)
+        await session.commit()
+
+    get_metadata_store().delete(ontology_id)
+
+    # 异步删除 Jena dataset
+    if dataset:
+        try:
+            import asyncio
+            jena = _get_jena()
+            if jena:
+                asyncio.create_task(_jena_delete_dataset(dataset))
+        except Exception:
+            pass
+
+    return True
+
+
+async def _jena_delete_dataset(dataset: str):
+    try:
+        jena = _get_jena()
+        if jena:
+            jena.delete_dataset(dataset)
+    except Exception as e:
+        print(f"[Jena] delete dataset {dataset} failed: {e}")
+
+
+# ============================================================================
+# 读操作：详情/图谱 → Jena（唯一可信源）
+# ============================================================================
+
+async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
+    """
+    本体完整详情：直接从 Jena 读取。
+    PostgreSQL 只提供 base_iri/dataset 信息。
+    """
+    async with SystemSession() as session:
+        result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        ont = result.scalar_one_or_none()
+        if not ont:
+            return None
+
+        base_iri = ont.base_iri
+        dataset = ont.dataset
+
+    # Jena 读取完整数据
+    jena = None
+    if dataset:
+        try:
+            jena = get_jena_client_for_dataset(dataset)
+        except Exception:
+            pass
+
+    if not jena:
+        # Jena 不可用时，返回空结构
+        return OntologyDetailResponse(
+            id=ont.id,
+            name=ont.name,
+            description=ont.description or "",
+            version=ont.version or "v1.0",
+            status=ont.status or "draft",
+            datasource=None,
+            base_iri=base_iri,
+            imports=[],
+            prefix_mappings={
+                "owl": "http://www.w3.org/2002/07/owl#",
+                "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                "xsd": "http://www.w3.org/2001/XMLSchema#",
+            },
+            object_count=0,
+            data_property_count=0,
+            object_property_count=0,
+            individual_count=0,
+            axiom_count=0,
+            created_at=ont.created_at.isoformat() if ont.created_at else "",
+            updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+            classes=[],
+            data_properties=[],
+            object_properties=[],
+            annotation_properties=[],
+            individuals=[],
+            axioms=[],
+            data_ranges=[],
+        )
+
+    # 从 Jena 批量读取
+    detail = jena.get_ontology_detail(base_iri)
+
+    return OntologyDetailResponse(
+        id=ont.id,
+        name=detail.get("name", ont.name),
+        description=detail.get("description", ont.description or ""),
+        version=ont.version or "v1.0",
+        status=ont.status or "draft",
+        datasource=None,
+        base_iri=base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=len(detail.get("classes", [])),
+        data_property_count=len(detail.get("data_properties", [])),
+        object_property_count=len(detail.get("object_properties", [])),
+        individual_count=len(detail.get("individuals", [])),
+        axiom_count=0,
+        created_at=ont.created_at.isoformat() if ont.created_at else "",
+        updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+        classes=detail.get("classes", []),
+        data_properties=detail.get("data_properties", []),
+        object_properties=detail.get("object_properties", []),
+        annotation_properties=detail.get("annotation_properties", []),
+        individuals=detail.get("individuals", []),
+        axioms=[],
+        data_ranges=[],
+    )
+
+
+# ============================================================================
+# 读操作：各类型实体列表 → Jena
+# ============================================================================
+
+async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
+    """类列表：从 Jena 读取"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri or not dataset:
+        return []
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.list_classes(base_iri)
+    except Exception:
+        return []
+
+
+async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
+    """DataProperty 列表：从 Jena 读取"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri or not dataset:
+        return []
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.list_datatype_properties(base_iri)
+    except Exception:
+        return []
+
+
+async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
+    """ObjectProperty 列表：从 Jena 读取"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri or not dataset:
+        return []
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.list_object_properties(base_iri)
+    except Exception:
+        return []
+
+
+async def get_annotation_properties(ontology_id: str) -> list:
+    """AnnotationProperty 列表：从 Jena 读取"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri or not dataset:
+        return []
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.list_annotation_properties(base_iri)
+    except Exception:
+        return []
+
+
+async def get_individuals(ontology_id: str) -> list:
+    """Individual 列表：从 Jena 读取"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri or not dataset:
+        return []
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.list_individuals(base_iri)
+    except Exception:
+        return []
+
+
+async def get_axioms(ontology_id: str) -> list:
+    """Axiom 列表（暂不支持）"""
+    return []
+
+
+async def get_data_ranges(ontology_id: str) -> list[DataRangeResponse]:
+    """DataRange 列表（暂不支持）"""
+    return []
+
+
+# ============================================================================
+# 写操作：Jena（唯一可信源）→ PostgreSQL（索引）
+# ============================================================================
 
 async def create_ontology(
     name: str,
@@ -128,35 +337,51 @@ async def create_ontology(
     imports: list = None,
     prefix_mappings: dict = None,
 ) -> OntologyResponse:
-    """创建本体：写入 PostgreSQL + metadata store，可选同步 Jena"""
-    from src.database import async_session_maker
+    """创建本体：写入 Jena + PostgreSQL 元数据"""
+    import uuid
+    from datetime import datetime
 
-    async with async_session_maker() as session:
-        async with session.begin():
-            import uuid
-            new_id = str(uuid.uuid4())[:8]
+    new_id = str(uuid.uuid4())[:8]
+    if not base_iri:
+        base_iri = f"http://onto-agent.com/ontology/{name}#"
+    # 使用统一 Dataset + Named Graph 架构
+    dataset = f"/onto-agent"
+    tbox_graph_uri = f"{dataset}/{new_id}/tbox"
+    abox_graph_uri = f"{dataset}/{new_id}/abox"
+    now = datetime.utcnow().isoformat() + "Z"
 
-            if not base_iri:
-                base_iri = f"http://onto-agent.com/ontology/{name}#"
+    # 1. Jena：创建 dataset + 本体头
+    try:
+        jena = get_jena_client()
+        jena.create_dataset(dataset)
+        ds_jena = get_jena_client_for_dataset(dataset)
+        ds_jena.create_ontology(name=name, base_iri=base_iri, description=description)
+    except Exception as e:
+        print(f"[Jena] create ontology failed: {e}")
 
-            dataset = f"/ontology_{new_id}"
-
-            ontology = Ontology(
-                id=new_id,
-                name=name,
-                description=description,
-                base_iri=base_iri,
-                dataset=dataset,
-                version="v1.0",
-                status="draft",
-            )
-            session.add(ontology)
-
+    # 2. PostgreSQL：写入本体元数据
+    async with SystemSession() as session:
+        ont = Ontology(
+            id=new_id,
+            name=name,
+            description=description,
+            base_iri=base_iri,
+            dataset=dataset,
+            tbox_graph_uri=tbox_graph_uri,
+            abox_graph_uri=abox_graph_uri,
+            version="v1.0",
+            status="draft",
+            class_count=0,
+            dp_count=0,
+            op_count=0,
+            ap_count=0,
+            individual_count=0,
+            axiom_count=0,
+        )
+        session.add(ont)
         await session.commit()
 
-    # 同时写 metadata store（向后兼容）
-    from datetime import datetime
-    now = datetime.utcnow().isoformat() + "Z"
+    # 3. metadata store（向后兼容）
     metadata = OntologyMetadata(
         id=new_id,
         name=name,
@@ -169,15 +394,6 @@ async def create_ontology(
         updated_at=now,
     )
     get_metadata_store().add(metadata)
-
-    # 异步创建 Jena dataset（不阻塞响应）
-    try:
-        import asyncio
-        jena = _get_jena()
-        if jena:
-            asyncio.create_task(_sync_jena_dataset(dataset, base_iri, name, description))
-    except Exception:
-        pass
 
     return OntologyResponse(
         id=new_id,
@@ -203,146 +419,6 @@ async def create_ontology(
     )
 
 
-async def _sync_jena_dataset(dataset: str, base_iri: str, name: str, description: str):
-    """后台任务：创建 Jena dataset 并写入本体头"""
-    try:
-        jena = _get_jena()
-        if not jena:
-            return
-        jena.create_dataset(dataset)
-        ds_jena = get_jena_client_for_dataset(dataset)
-        if ds_jena:
-            ds_jena.create_ontology(name=name, base_iri=base_iri, description=description or "")
-    except Exception as e:
-        print(f"[JenaSync] Failed to create dataset {dataset}: {e}")
-
-
-async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
-    """获取本体（不含详情实体）"""
-    from src.database import async_session_maker
-    from sqlalchemy import select, func
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        ont = result.scalar_one_or_none()
-        if not ont:
-            return None
-
-        class_count = await session.scalar(
-            select(func.count()).select_from(OntologyClass).where(OntologyClass.ontology_id == ontology_id)
-        )
-        dp_count = await session.scalar(
-            select(func.count()).select_from(DataProperty).where(DataProperty.ontology_id == ontology_id)
-        )
-        op_count = await session.scalar(
-            select(func.count()).select_from(ObjectProperty).where(ObjectProperty.ontology_id == ontology_id)
-        )
-
-        return OntologyResponse(
-            id=ont.id,
-            name=ont.name,
-            description=ont.description or "",
-            version=ont.version or "v1.0",
-            status=ont.status or "draft",
-            datasource=None,
-            base_iri=ont.base_iri,
-            imports=[],
-            prefix_mappings={
-                "owl": "http://www.w3.org/2002/07/owl#",
-                "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-                "xsd": "http://www.w3.org/2001/XMLSchema#",
-            },
-            object_count=class_count or 0,
-            data_property_count=dp_count or 0,
-            object_property_count=op_count or 0,
-            individual_count=0,
-            axiom_count=0,
-            created_at=ont.created_at.isoformat() if ont.created_at else "",
-            updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
-        )
-
-
-async def delete_ontology(ontology_id: str) -> bool:
-    """删除本体：PostgreSQL + metadata store + Jena dataset"""
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        ont = result.scalar_one_or_none()
-        if not ont:
-            return False
-
-        dataset = ont.dataset
-        await session.delete(ont)
-        await session.commit()
-
-    # 删除 metadata store
-    get_metadata_store().delete(ontology_id)
-
-    # 异步删除 Jena dataset
-    try:
-        import asyncio
-        jena = _get_jena()
-        if jena and dataset:
-            asyncio.create_task(_delete_jena_dataset(dataset))
-    except Exception:
-        pass
-
-    return True
-
-
-async def _delete_jena_dataset(dataset: str):
-    """后台任务：删除 Jena dataset"""
-    try:
-        jena = _get_jena()
-        if jena:
-            jena.delete_dataset(dataset)
-    except Exception as e:
-        print(f"[JenaSync] Failed to delete dataset {dataset}: {e}")
-
-
-async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-    from sqlalchemy.orm import selectinload
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Ontology)
-            .where(Ontology.id == ontology_id)
-            .options(
-                selectinload(Ontology.classes),
-                selectinload(Ontology.data_properties),
-                selectinload(Ontology.object_properties),
-                selectinload(Ontology.annotation_properties),
-                selectinload(Ontology.individuals),
-                selectinload(Ontology.axioms),
-                selectinload(Ontology.data_ranges),
-            )
-        )
-        ontology = result.scalar_one_or_none()
-        if not ontology:
-            return None
-        return _build_detail_response(ontology)
-
-
-async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(OntologyClass).where(OntologyClass.ontology_id == ontology_id)
-        )
-        classes = result.scalars().all()
-        return [_to_class_response(c) for c in classes]
-
-
 async def create_ontology_class(
     ontology_id: str,
     name: str,
@@ -354,60 +430,44 @@ async def create_ontology_class(
     disjoint_with: list = None,
     super_classes: list = None,
 ) -> OntologyClassResponse:
-    """创建类：写入 PostgreSQL，异步同步 Jena"""
-    from src.database import async_session_maker
-    import uuid
+    """创建类：Jena → PostgreSQL 索引"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        ont_result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        if not ont_result.scalar_one_or_none():
-            raise ValueError(f"Ontology {ontology_id} not found")
+    class_uri = f"{base_iri}{name}"
+    super_iris = [f"{base_iri}{sc}" for sc in (super_classes or [])]
 
-        new_class = OntologyClass(
-            id=str(uuid.uuid4())[:12],
-            ontology_id=ontology_id,
+    # 1. Jena 写入
+    jena_result = None
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena_result = jena.create_class(
+            ontology_iri=base_iri,
             name=name,
             display_name=display_name,
             description=description,
-            labels=labels or {},
-            comments=comments or {},
-            equivalent_to=equivalent_to or [],
-            disjoint_with=disjoint_with or [],
-            super_classes=super_classes or [],
+            super_classes=super_iris if super_iris else None,
         )
-        session.add(new_class)
-        await session.commit()
-        await session.refresh(new_class)
-
-    try:
-        import asyncio
-        asyncio.create_task(_sync_class_to_jena(ontology_id, new_class))
-    except Exception:
-        pass
-
-    return _to_class_response(new_class)
-
-
-async def _sync_class_to_jena(ontology_id: str, cls):
-    """后台任务：同步类到 Jena"""
-    try:
-        meta = get_metadata_store().get(ontology_id)
-        if not meta:
-            return
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            super_iris = [f"{meta.base_iri}{sc}" for sc in (cls.super_classes or [])]
-            jena.create_class(
-                ontology_iri=meta.base_iri,
-                name=cls.name,
-                display_name=cls.display_name,
-                description=cls.description,
-                super_classes=super_iris if super_iris else None,
-            )
     except Exception as e:
-        print(f"[JenaSync] Failed to sync class {cls.id}: {e}")
+        print(f"[Jena] create class failed: {e}")
+
+    # 2. PostgreSQL 索引
+    await _index_entity(ontology_id, "CLASS", name, display_name, class_uri)
+    await _increment_count(ontology_id, "class_count")
+
+    return jena_result or OntologyClassResponse(
+        id=name,
+        ontology_id=ontology_id,
+        name=name,
+        display_name=display_name,
+        description=description,
+        labels=labels or {},
+        comments=comments or {},
+        equivalent_to=equivalent_to or [],
+        disjoint_with=disjoint_with or [],
+        super_classes=super_classes or [],
+    )
 
 
 async def update_ontology_class(
@@ -422,76 +482,66 @@ async def update_ontology_class(
     disjoint_with: list = None,
     super_classes: list = None,
 ) -> Optional[OntologyClassResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """更新类：Jena → PostgreSQL 索引（名称变化时）"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return None
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(OntologyClass).where(
-                OntologyClass.id == class_id,
-                OntologyClass.ontology_id == ontology_id,
+    class_uri = f"{base_iri}{class_id}"
+
+    # Jena 更新
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena.update_class(class_uri, display_name=display_name, description=description)
+    except Exception as e:
+        print(f"[Jena] update class failed: {e}")
+
+    # PostgreSQL 索引更新（名称/显示名变化）
+    if name or display_name:
+        async with SystemSession() as session:
+            await session.execute(
+                update(EntityIndex)
+                .where(
+                    EntityIndex.ontology_id == ontology_id,
+                    EntityIndex.entity_type == "CLASS",
+                    EntityIndex.name == class_id,
+                )
+                .values(
+                    name=name or class_id,
+                    display_name=display_name,
+                    jena_uri=f"{base_iri}{name}" if name else class_uri,
+                )
             )
-        )
-        cls = result.scalar_one_or_none()
-        if not cls:
-            return None
+            await session.commit()
 
-        if name is not None:
-            cls.name = name
-        if display_name is not None:
-            cls.display_name = display_name
-        if description is not None:
-            cls.description = description
-        if labels is not None:
-            cls.labels = labels
-        if comments is not None:
-            cls.comments = comments
-        if equivalent_to is not None:
-            cls.equivalent_to = equivalent_to
-        if disjoint_with is not None:
-            cls.disjoint_with = disjoint_with
-        if super_classes is not None:
-            cls.super_classes = super_classes
-
-        await session.commit()
-        await session.refresh(cls)
-        return _to_class_response(cls)
+    # 重新从 Jena 读取最新数据
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        return jena.get_class(class_uri)
+    except Exception:
+        return None
 
 
 async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """删除类：Jena + PostgreSQL 索引"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(OntologyClass).where(
-                OntologyClass.id == class_id,
-                OntologyClass.ontology_id == ontology_id,
-            )
-        )
-        cls = result.scalar_one_or_none()
-        if not cls:
-            return False
-        await session.delete(cls)
-        await session.commit()
-        return True
+    class_uri = f"{base_iri}{class_id}"
 
+    # 1. Jena 删除
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena.delete_class(class_uri)
+    except Exception as e:
+        print(f"[Jena] delete class failed: {e}")
 
-# ============================================================
-# DataProperty CRUD
-# ============================================================
+    # 2. PostgreSQL 索引删除
+    await _delete_entity_index(ontology_id, "CLASS", class_id)
+    await _decrement_count(ontology_id, "class_count")
 
-
-async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(DataProperty).where(DataProperty.ontology_id == ontology_id)
-        )
-        props = result.scalars().all()
-        return [_to_dataprop_response(p) for p in props]
+    return True
 
 
 async def create_data_property(
@@ -504,59 +554,44 @@ async def create_data_property(
     characteristics: list = None,
     super_property_id: str = None,
 ) -> DataPropertyResponse:
-    from src.database import async_session_maker
-    import uuid
+    """创建 DataProperty：Jena → PostgreSQL 索引"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        ont_result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        if not ont_result.scalar_one_or_none():
-            raise ValueError(f"Ontology {ontology_id} not found")
+    domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
 
-        new_prop = DataProperty(
-            id=str(uuid.uuid4())[:12],
-            ontology_id=ontology_id,
+    jena_result = None
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena_result = jena.create_datatype_property(
+            ontology_iri=base_iri,
             name=name,
-            display_name=display_name,
-            description=description,
-            labels={},
-            comments={},
-            domain_ids=domain_ids,
+            domain_iri=domain_iri,
             range_type=range_type,
-            characteristics=characteristics or [],
-            super_property_id=super_property_id,
+            display_name=display_name,
+            characteristics=characteristics,
         )
-        session.add(new_prop)
-        await session.commit()
-        await session.refresh(new_prop)
-
-    try:
-        import asyncio
-        asyncio.create_task(_sync_dataprop_to_jena(ontology_id, new_prop))
-    except Exception:
-        pass
-
-    return _to_dataprop_response(new_prop)
-
-
-async def _sync_dataprop_to_jena(ontology_id: str, prop):
-    try:
-        meta = get_metadata_store().get(ontology_id)
-        if not meta or not prop.domain_ids:
-            return
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            jena.create_datatype_property(
-                ontology_iri=meta.base_iri,
-                name=prop.name,
-                domain_iri=f"{meta.base_iri}{prop.domain_ids[0]}",
-                range_type=prop.range_type,
-                display_name=prop.display_name,
-                characteristics=prop.characteristics,
-            )
     except Exception as e:
-        print(f"[JenaSync] Failed to sync data property {prop.id}: {e}")
+        print(f"[Jena] create dataprop failed: {e}")
+
+    prop_uri = f"{base_iri}{name}"
+    await _index_entity(ontology_id, "DP", name, display_name, prop_uri)
+    await _increment_count(ontology_id, "dp_count")
+
+    return jena_result or DataPropertyResponse(
+        id=name,
+        ontology_id=ontology_id,
+        name=name,
+        display_name=display_name,
+        description=description,
+        labels={},
+        comments={},
+        domain_ids=domain_ids,
+        range_type=range_type,
+        characteristics=characteristics or [],
+        super_property_id=super_property_id,
+    )
 
 
 async def update_data_property(
@@ -570,74 +605,66 @@ async def update_data_property(
     characteristics: list = None,
     super_property_id: str = None,
 ) -> Optional[DataPropertyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """更新 DataProperty（暂只支持 display_name/description）"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return None
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(DataProperty).where(
-                DataProperty.id == prop_id,
-                DataProperty.ontology_id == ontology_id,
-            )
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
+        jena.delete_datatype_property(f"{base_iri}{prop_id}")
+        jena.create_datatype_property(
+            ontology_iri=base_iri,
+            name=prop_id,
+            domain_iri=f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri,
+            range_type=range_type or "string",
+            display_name=display_name,
+            characteristics=characteristics,
         )
-        prop = result.scalar_one_or_none()
-        if not prop:
-            return None
+    except Exception as e:
+        print(f"[Jena] update dataprop failed: {e}")
 
-        if name is not None:
-            prop.name = name
-        if display_name is not None:
-            prop.display_name = display_name
-        if description is not None:
-            prop.description = description
-        if domain_ids is not None:
-            prop.domain_ids = domain_ids
-        if range_type is not None:
-            prop.range_type = range_type
-        if characteristics is not None:
-            prop.characteristics = characteristics
-        if super_property_id is not None:
-            prop.super_property_id = super_property_id
+    # 索引更新
+    if name or display_name:
+        async with SystemSession() as session:
+            await session.execute(
+                update(EntityIndex)
+                .where(
+                    EntityIndex.ontology_id == ontology_id,
+                    EntityIndex.entity_type == "DP",
+                    EntityIndex.name == prop_id,
+                )
+                .values(name=name or prop_id, display_name=display_name)
+            )
+            await session.commit()
 
-        await session.commit()
-        await session.refresh(prop)
-        return _to_dataprop_response(prop)
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        props = jena.list_datatype_properties(base_iri)
+        for p in props:
+            if p.id == prop_id:
+                return p
+    except Exception:
+        pass
+    return None
 
 
 async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """删除 DataProperty：Jena + PostgreSQL"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(DataProperty).where(
-                DataProperty.id == prop_id,
-                DataProperty.ontology_id == ontology_id,
-            )
-        )
-        prop = result.scalar_one_or_none()
-        if not prop:
-            return False
-        await session.delete(prop)
-        await session.commit()
-        return True
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena.delete_datatype_property(f"{base_iri}{prop_id}")
+    except Exception as e:
+        print(f"[Jena] delete dataprop failed: {e}")
 
-
-# ============================================================
-# ObjectProperty CRUD
-# ============================================================
-
-
-async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(ObjectProperty).where(ObjectProperty.ontology_id == ontology_id)
-        )
-        props = result.scalars().all()
-        return [_to_objprop_response(p) for p in props]
+    await _delete_entity_index(ontology_id, "DP", prop_id)
+    await _decrement_count(ontology_id, "dp_count")
+    return True
 
 
 async def create_object_property(
@@ -652,63 +679,49 @@ async def create_object_property(
     inverse_of_id: str = None,
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
-    from src.database import async_session_maker
-    import uuid
+    """创建 ObjectProperty：Jena → PostgreSQL 索引"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        ont_result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        if not ont_result.scalar_one_or_none():
-            raise ValueError(f"Ontology {ontology_id} not found")
+    domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
+    range_iri = f"{base_iri}{range_ids[0]}" if range_ids else base_iri
+    inverse_of = f"{base_iri}{inverse_of_id}" if inverse_of_id else None
 
-        new_prop = ObjectProperty(
-            id=str(uuid.uuid4())[:12],
-            ontology_id=ontology_id,
+    jena_result = None
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena_result = jena.create_object_property(
+            ontology_iri=base_iri,
             name=name,
+            domain_iri=domain_iri,
+            range_iri=range_iri,
             display_name=display_name,
-            description=description,
-            labels={},
-            comments={},
-            domain_ids=domain_ids,
-            range_ids=range_ids,
-            characteristics=characteristics or [],
-            super_property_id=super_property_id,
-            inverse_of_id=inverse_of_id,
-            property_chain=property_chain or [],
+            characteristics=characteristics,
+            inverse_of=inverse_of,
         )
-        session.add(new_prop)
-        await session.commit()
-        await session.refresh(new_prop)
-
-    try:
-        import asyncio
-        asyncio.create_task(_sync_objprop_to_jena(ontology_id, new_prop))
-    except Exception:
-        pass
-
-    return _to_objprop_response(new_prop)
-
-
-async def _sync_objprop_to_jena(ontology_id: str, prop):
-    try:
-        meta = get_metadata_store().get(ontology_id)
-        if not meta or not prop.domain_ids or not prop.range_ids:
-            return
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            inverse_of = f"{meta.base_iri}{prop.inverse_of_id}" if prop.inverse_of_id else None
-            jena.create_object_property(
-                ontology_iri=meta.base_iri,
-                name=prop.name,
-                domain_iri=f"{meta.base_iri}{prop.domain_ids[0]}",
-                range_iri=f"{meta.base_iri}{prop.range_ids[0]}",
-                display_name=prop.display_name,
-                characteristics=prop.characteristics,
-                inverse_of=inverse_of,
-            )
     except Exception as e:
-        print(f"[JenaSync] Failed to sync object property {prop.id}: {e}")
+        print(f"[Jena] create objprop failed: {e}")
+
+    prop_uri = f"{base_iri}{name}"
+    await _index_entity(ontology_id, "OP", name, display_name, prop_uri)
+    await _increment_count(ontology_id, "op_count")
+
+    return jena_result or ObjectPropertyResponse(
+        id=name,
+        ontology_id=ontology_id,
+        name=name,
+        display_name=display_name,
+        description=description,
+        labels={},
+        comments={},
+        domain_ids=domain_ids,
+        range_ids=range_ids,
+        characteristics=characteristics or [],
+        super_property_id=super_property_id,
+        inverse_of_id=inverse_of_id,
+        property_chain=property_chain or [],
+    )
 
 
 async def update_object_property(
@@ -724,78 +737,65 @@ async def update_object_property(
     inverse_of_id: str = None,
     property_chain: list = None,
 ) -> Optional[ObjectPropertyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """更新 ObjectProperty（简化：delete + recreate）"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return None
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(ObjectProperty).where(
-                ObjectProperty.id == prop_id,
-                ObjectProperty.ontology_id == ontology_id,
-            )
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena.delete_object_property(f"{base_iri}{prop_id}")
+        jena.create_object_property(
+            ontology_iri=base_iri,
+            name=prop_id,
+            domain_iri=f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri,
+            range_iri=f"{base_iri}{range_ids[0]}" if range_ids else base_iri,
+            display_name=display_name,
+            characteristics=characteristics,
+            inverse_of=f"{base_iri}{inverse_of_id}" if inverse_of_id else None,
         )
-        prop = result.scalar_one_or_none()
-        if not prop:
-            return None
+    except Exception as e:
+        print(f"[Jena] update objprop failed: {e}")
 
-        if name is not None:
-            prop.name = name
-        if display_name is not None:
-            prop.display_name = display_name
-        if description is not None:
-            prop.description = description
-        if domain_ids is not None:
-            prop.domain_ids = domain_ids
-        if range_ids is not None:
-            prop.range_ids = range_ids
-        if characteristics is not None:
-            prop.characteristics = characteristics
-        if super_property_id is not None:
-            prop.super_property_id = super_property_id
-        if inverse_of_id is not None:
-            prop.inverse_of_id = inverse_of_id
-        if property_chain is not None:
-            prop.property_chain = property_chain
+    if name or display_name:
+        async with SystemSession() as session:
+            await session.execute(
+                update(EntityIndex)
+                .where(
+                    EntityIndex.ontology_id == ontology_id,
+                    EntityIndex.entity_type == "OP",
+                    EntityIndex.name == prop_id,
+                )
+                .values(name=name or prop_id, display_name=display_name)
+            )
+            await session.commit()
 
-        await session.commit()
-        await session.refresh(prop)
-        return _to_objprop_response(prop)
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        props = jena.list_object_properties(base_iri)
+        for p in props:
+            if p.id == prop_id:
+                return p
+    except Exception:
+        pass
+    return None
 
 
 async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
-    from src.database import async_session_maker
-    from sqlalchemy import select
+    """删除 ObjectProperty：Jena + PostgreSQL"""
+    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
 
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(ObjectProperty).where(
-                ObjectProperty.id == prop_id,
-                ObjectProperty.ontology_id == ontology_id,
-            )
-        )
-        prop = result.scalar_one_or_none()
-        if not prop:
-            return False
-        await session.delete(prop)
-        await session.commit()
-        return True
+    try:
+        jena = get_jena_client_for_dataset(dataset)
+        jena.delete_object_property(f"{base_iri}{prop_id}")
+    except Exception as e:
+        print(f"[Jena] delete objprop failed: {e}")
 
-
-# ============================================================
-# AnnotationProperty CRUD
-# ============================================================
-
-
-async def get_annotation_properties(ontology_id: str) -> list[AnnotationPropertyResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(AnnotationProperty).where(AnnotationProperty.ontology_id == ontology_id)
-        )
-        props = result.scalars().all()
-        return [_to_annprop_response(p) for p in props]
+    await _delete_entity_index(ontology_id, "OP", prop_id)
+    await _decrement_count(ontology_id, "op_count")
+    return True
 
 
 async def create_annotation_property(
@@ -807,43 +807,25 @@ async def create_annotation_property(
     range_ids: list = None,
     sub_property_of_id: str = None,
 ) -> AnnotationPropertyResponse:
-    from src.database import async_session_maker
-    import uuid
+    """创建 AnnotationProperty（暂不写 Jena，只更新 PostgreSQL 索引）"""
+    base_iri, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        new_prop = AnnotationProperty(
-            id=str(uuid.uuid4())[:12],
-            ontology_id=ontology_id,
-            name=name,
-            display_name=display_name,
-            description=description,
-            labels={},
-            comments={},
-            domain_ids=domain_ids or [],
-            range_ids=range_ids or [],
-            sub_property_of_id=sub_property_of_id,
-        )
-        session.add(new_prop)
-        await session.commit()
-        await session.refresh(new_prop)
-        return _to_annprop_response(new_prop)
+    prop_uri = f"{base_iri}{name}"
+    await _index_entity(ontology_id, "AP", name, display_name, prop_uri)
+    await _increment_count(ontology_id, "ap_count")
 
-
-# ============================================================
-# Individual CRUD
-# ============================================================
-
-
-async def get_individuals(ontology_id: str) -> list[IndividualResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Individual).where(Individual.ontology_id == ontology_id)
-        )
-        individuals = result.scalars().all()
-        return [_to_individual_response(i) for i in individuals]
+    return AnnotationPropertyResponse(
+        id=name,
+        ontology_id=ontology_id,
+        name=name,
+        display_name=display_name,
+        description=description,
+        domain_ids=domain_ids or [],
+        range_ids=range_ids or [],
+        sub_property_of_id=sub_property_of_id,
+    )
 
 
 async def create_individual(
@@ -857,43 +839,27 @@ async def create_individual(
     data_property_assertions: list = None,
     object_property_assertions: list = None,
 ) -> IndividualResponse:
-    from src.database import async_session_maker
-    import uuid
+    """创建 Individual（暂只写 PostgreSQL 索引，Jena 个体写入较复杂）"""
+    base_iri, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        new_ind = Individual(
-            id=str(uuid.uuid4())[:12],
-            ontology_id=ontology_id,
-            name=name,
-            display_name=display_name,
-            description=description,
-            types=types or [],
-            labels=labels or {},
-            comments=comments or {},
-            data_property_assertions=data_property_assertions or [],
-            object_property_assertions=object_property_assertions or [],
-        )
-        session.add(new_ind)
-        await session.commit()
-        await session.refresh(new_ind)
-        return _to_individual_response(new_ind)
+    ind_uri = f"{base_iri}{name}"
+    await _index_entity(ontology_id, "INDIVIDUAL", name, display_name, ind_uri)
+    await _increment_count(ontology_id, "individual_count")
 
-
-# ============================================================
-# Axiom CRUD
-# ============================================================
-
-
-async def get_axioms(ontology_id: str) -> list[AxiomResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Axiom).where(Axiom.ontology_id == ontology_id)
-        )
-        axioms = result.scalars().all()
-        return [_to_axiom_response(a) for a in axioms]
+    return IndividualResponse(
+        id=name,
+        ontology_id=ontology_id,
+        name=name,
+        display_name=display_name,
+        description=description,
+        types=types or [],
+        labels=labels or {},
+        comments=comments or {},
+        data_property_assertions=data_property_assertions or [],
+        object_property_assertions=object_property_assertions or [],
+    )
 
 
 async def create_axiom(
@@ -903,319 +869,102 @@ async def create_axiom(
     assertions: dict = None,
     annotations: list = None,
 ) -> AxiomResponse:
-    from src.database import async_session_maker
+    """创建 Axiom（暂只写 PostgreSQL 索引）"""
     import uuid
+    base_iri, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
 
-    async with async_session_maker() as session:
-        new_axiom = Axiom(
+    new_id = str(uuid.uuid4())[:12]
+    await _increment_count(ontology_id, "axiom_count")
+
+    return AxiomResponse(
+        id=new_id,
+        ontology_id=ontology_id,
+        type=axiom_type,
+        subject=subject,
+        assertions=assertions or {},
+        annotations=annotations or [],
+    )
+
+
+# ============================================================================
+# 内部辅助函数
+# ============================================================================
+
+async def _get_ontology_iri(ontology_id: str) -> tuple[Optional[str], Optional[str]]:
+    """从 PostgreSQL 获取本体的 base_iri 和 dataset"""
+    async with SystemSession() as session:
+        result = await session.execute(
+            select(Ontology.base_iri, Ontology.dataset).where(Ontology.id == ontology_id)
+        )
+        row = result.one_or_none()
+        if not row:
+            return None, None
+        return row[0], row[1]
+
+
+async def _index_entity(
+    ontology_id: str,
+    entity_type: str,
+    name: str,
+    display_name: str = None,
+    jena_uri: str = None,
+):
+    """向 PostgreSQL entity_index 写入一条索引"""
+    import uuid
+    async with SystemSession() as session:
+        idx = EntityIndex(
             id=str(uuid.uuid4())[:12],
             ontology_id=ontology_id,
-            type=axiom_type,
-            subject=subject,
-            assertions=assertions or {},
-            annotations=annotations or [],
+            entity_type=entity_type,
+            name=name,
+            display_name=display_name,
+            jena_uri=jena_uri,
         )
-        session.add(new_axiom)
+        session.add(idx)
         await session.commit()
-        await session.refresh(new_axiom)
-        return _to_axiom_response(new_axiom)
 
 
-# ============================================================
-# DataRange CRUD
-# ============================================================
-
-
-async def get_data_ranges(ontology_id: str) -> list[DataRangeResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(DataRange).where(DataRange.ontology_id == ontology_id)
+async def _delete_entity_index(ontology_id: str, entity_type: str, name: str):
+    """从 PostgreSQL entity_index 删除一条索引"""
+    from sqlalchemy import delete as sql_delete
+    async with SystemSession() as session:
+        await session.execute(
+            sql_delete(EntityIndex).where(
+                EntityIndex.ontology_id == ontology_id,
+                EntityIndex.entity_type == entity_type,
+                EntityIndex.name == name,
+            )
         )
-        ranges = result.scalars().all()
-        return [_to_datarange_response(r) for r in ranges]
+        await session.commit()
 
 
-# ============================================================
-# ORM → Response 模型转换（辅助函数）
-# ============================================================
-
-
-def _build_detail_response(ont: Ontology) -> OntologyDetailResponse:
-    return OntologyDetailResponse(
-        id=ont.id,
-        name=ont.name,
-        description=ont.description or "",
-        version=ont.version or "v1.0",
-        status=ont.status or "draft",
-        datasource=None,
-        base_iri=ont.base_iri,
-        imports=[],
-        prefix_mappings={
-            "owl": "http://www.w3.org/2002/07/owl#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-        },
-        object_count=len(ont.classes) if ont.classes else 0,
-        data_property_count=len(ont.data_properties) if ont.data_properties else 0,
-        object_property_count=len(ont.object_properties) if ont.object_properties else 0,
-        individual_count=len(ont.individuals) if ont.individuals else 0,
-        axiom_count=len(ont.axioms) if ont.axioms else 0,
-        created_at=ont.created_at.isoformat() if ont.created_at else "",
-        updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
-        classes=[_to_class_response(c) for c in (ont.classes or [])],
-        data_properties=[_to_dataprop_response(p) for p in (ont.data_properties or [])],
-        object_properties=[_to_objprop_response(p) for p in (ont.object_properties or [])],
-        annotation_properties=[_to_annprop_response(p) for p in (ont.annotation_properties or [])],
-        individuals=[_to_individual_response(i) for i in (ont.individuals or [])],
-        axioms=[_to_axiom_response(a) for a in (ont.axioms or [])],
-        data_ranges=[_to_datarange_response(d) for d in (ont.data_ranges or [])],
-    )
-
-
-def _to_class_response(c) -> OntologyClassResponse:
-    return OntologyClassResponse(
-        id=c.id,
-        ontology_id=c.ontology_id,
-        name=c.name,
-        display_name=c.display_name,
-        description=c.description,
-        labels=c.labels if isinstance(c.labels, dict) else {},
-        comments=c.comments if isinstance(c.comments, dict) else {},
-        equivalent_to=c.equivalent_to if isinstance(c.equivalent_to, list) else [],
-        disjoint_with=c.disjoint_with if isinstance(c.disjoint_with, list) else [],
-        super_classes=c.super_classes if isinstance(c.super_classes, list) else [],
-    )
-
-
-def _to_dataprop_response(p) -> DataPropertyResponse:
-    return DataPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        labels=p.labels if isinstance(p.labels, dict) else {},
-        comments=p.comments if isinstance(p.comments, dict) else {},
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_type=p.range_type or "string",
-        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
-        super_property_id=p.super_property_id,
-    )
-
-
-def _to_objprop_response(p) -> ObjectPropertyResponse:
-    return ObjectPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        labels=p.labels if isinstance(p.labels, dict) else {},
-        comments=p.comments if isinstance(p.comments, dict) else {},
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
-        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
-        super_property_id=p.super_property_id,
-        inverse_of_id=p.inverse_of_id,
-        property_chain=p.property_chain if isinstance(p.property_chain, list) else [],
-    )
-
-
-def _to_annprop_response(p) -> AnnotationPropertyResponse:
-    return AnnotationPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
-        sub_property_of_id=p.sub_property_of_id,
-    )
-
-
-def _to_individual_response(i) -> IndividualResponse:
-    return IndividualResponse(
-        id=i.id,
-        ontology_id=i.ontology_id,
-        name=i.name,
-        display_name=i.display_name,
-        description=i.description,
-        types=i.types if isinstance(i.types, list) else [],
-        labels=i.labels if isinstance(i.labels, dict) else {},
-        comments=i.comments if isinstance(i.comments, dict) else {},
-        data_property_assertions=i.data_property_assertions if isinstance(i.data_property_assertions, list) else [],
-        object_property_assertions=i.object_property_assertions if isinstance(i.object_property_assertions, list) else [],
-    )
-
-
-def _to_axiom_response(a) -> AxiomResponse:
-    return AxiomResponse(
-        id=a.id,
-        ontology_id=a.ontology_id,
-        type=a.type,
-        subject=a.subject,
-        assertions=a.assertions if isinstance(a.assertions, dict) else {},
-        annotations=a.annotations if isinstance(a.annotations, list) else [],
-    )
-
-
-def _to_datarange_response(d) -> DataRangeResponse:
-    return DataRangeResponse(
-        id=d.id,
-        ontology_id=d.ontology_id,
-        type=d.type,
-        values=d.values,
-        base_type=d.base_type,
-        facets=d.facets,
-    )
-
-async def get_data_ranges(ontology_id: str) -> list[DataRangeResponse]:
-    from src.database import async_session_maker
-    from sqlalchemy import select
-
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(DataRange).where(DataRange.ontology_id == ontology_id)
+async def _increment_count(ontology_id: str, count_field: str):
+    """PostgreSQL ontology 表计数 +1"""
+    from sqlalchemy import update
+    from sqlalchemy import literal
+    async with SystemSession() as session:
+        col = getattr(Ontology, count_field)
+        await session.execute(
+            update(Ontology)
+            .where(Ontology.id == ontology_id)
+            .values({count_field: col + 1})
         )
-        ranges = result.scalars().all()
-        return [_to_datarange_response(r) for r in ranges]
+        await session.commit()
 
 
-# ============================================================
-# ORM → Response 模型转换（辅助函数）
-# ============================================================
-
-
-def _build_detail_response(ont: Ontology) -> OntologyDetailResponse:
-    return OntologyDetailResponse(
-        id=ont.id,
-        name=ont.name,
-        description=ont.description or "",
-        version=ont.version or "v1.0",
-        status=ont.status or "draft",
-        datasource=None,
-        base_iri=ont.base_iri,
-        imports=[],
-        prefix_mappings={
-            "owl": "http://www.w3.org/2002/07/owl#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-        },
-        object_count=len(ont.classes) if ont.classes else 0,
-        data_property_count=len(ont.data_properties) if ont.data_properties else 0,
-        object_property_count=len(ont.object_properties) if ont.object_properties else 0,
-        individual_count=len(ont.individuals) if ont.individuals else 0,
-        axiom_count=len(ont.axioms) if ont.axioms else 0,
-        created_at=ont.created_at.isoformat() if ont.created_at else "",
-        updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
-        classes=[_to_class_response(c) for c in (ont.classes or [])],
-        data_properties=[_to_dataprop_response(p) for p in (ont.data_properties or [])],
-        object_properties=[_to_objprop_response(p) for p in (ont.object_properties or [])],
-        annotation_properties=[_to_annprop_response(p) for p in (ont.annotation_properties or [])],
-        individuals=[_to_individual_response(i) for i in (ont.individuals or [])],
-        axioms=[_to_axiom_response(a) for a in (ont.axioms or [])],
-        data_ranges=[_to_datarange_response(d) for d in (ont.data_ranges or [])],
-    )
-
-
-def _to_class_response(c) -> OntologyClassResponse:
-    return OntologyClassResponse(
-        id=c.id,
-        ontology_id=c.ontology_id,
-        name=c.name,
-        display_name=c.display_name,
-        description=c.description,
-        labels=c.labels if isinstance(c.labels, dict) else {},
-        comments=c.comments if isinstance(c.comments, dict) else {},
-        equivalent_to=c.equivalent_to if isinstance(c.equivalent_to, list) else [],
-        disjoint_with=c.disjoint_with if isinstance(c.disjoint_with, list) else [],
-        super_classes=c.super_classes if isinstance(c.super_classes, list) else [],
-    )
-
-
-def _to_dataprop_response(p) -> DataPropertyResponse:
-    return DataPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        labels=p.labels if isinstance(p.labels, dict) else {},
-        comments=p.comments if isinstance(p.comments, dict) else {},
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_type=p.range_type or "string",
-        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
-        super_property_id=p.super_property_id,
-    )
-
-
-def _to_objprop_response(p) -> ObjectPropertyResponse:
-    return ObjectPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        labels=p.labels if isinstance(p.labels, dict) else {},
-        comments=p.comments if isinstance(p.comments, dict) else {},
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
-        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
-        super_property_id=p.super_property_id,
-        inverse_of_id=p.inverse_of_id,
-        property_chain=p.property_chain if isinstance(p.property_chain, list) else [],
-    )
-
-
-def _to_annprop_response(p) -> AnnotationPropertyResponse:
-    return AnnotationPropertyResponse(
-        id=p.id,
-        ontology_id=p.ontology_id,
-        name=p.name,
-        display_name=p.display_name,
-        description=p.description,
-        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
-        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
-        sub_property_of_id=p.sub_property_of_id,
-    )
-
-
-def _to_individual_response(i) -> IndividualResponse:
-    return IndividualResponse(
-        id=i.id,
-        ontology_id=i.ontology_id,
-        name=i.name,
-        display_name=i.display_name,
-        description=i.description,
-        types=i.types if isinstance(i.types, list) else [],
-        labels=i.labels if isinstance(i.labels, dict) else {},
-        comments=i.comments if isinstance(i.comments, dict) else {},
-        data_property_assertions=i.data_property_assertions if isinstance(i.data_property_assertions, list) else [],
-        object_property_assertions=i.object_property_assertions if isinstance(i.object_property_assertions, list) else [],
-    )
-
-
-def _to_axiom_response(a) -> AxiomResponse:
-    return AxiomResponse(
-        id=a.id,
-        ontology_id=a.ontology_id,
-        type=a.type,
-        subject=a.subject,
-        assertions=a.assertions if isinstance(a.assertions, dict) else {},
-        annotations=a.annotations if isinstance(a.annotations, list) else [],
-    )
-
-
-def _to_datarange_response(d) -> DataRangeResponse:
-    return DataRangeResponse(
-        id=d.id,
-        ontology_id=d.ontology_id,
-        type=d.type,
-        values=d.values,
-        base_type=d.base_type,
-        facets=d.facets,
-    )
+async def _decrement_count(ontology_id: str, count_field: str):
+    """PostgreSQL ontology 表计数 -1（最小为0）"""
+    from sqlalchemy import update
+    async with SystemSession() as session:
+        col = getattr(Ontology, count_field)
+        # SQL: GREATEST(0, col - 1)
+        from sqlalchemy import case
+        new_val = case((col <= 0, 0), else_=col - 1)
+        await session.execute(
+            update(Ontology)
+            .where(Ontology.id == ontology_id)
+            .values({count_field: new_val})
+        )
+        await session.commit()

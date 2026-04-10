@@ -126,7 +126,7 @@ class JenaClient:
         try:
             response = httpx.get(
                 f"{self.fuseki_url}/$/ping",
-                timeout=5,
+                timeout=1,
                 auth=self._get_auth(),
             )
             return response.status_code == 200

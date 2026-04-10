@@ -440,6 +440,54 @@ function renderLink(
   const linkColor = isHighlighted ? COLORS.objectProp : COLORS.linkDefault
   const linkWidth = isHighlighted ? 2.5 * globalScale : 1.5 * globalScale
 
+  const isSelfLoop = sourceNode.id === targetNode.id
+
+  if (isSelfLoop) {
+    const minDim = Math.min(shw * 2, shh * 2)
+    const radius = minDim / 3
+    const arcCenterX = sx - shw + minDim
+    const arcCenterY = sy - shh + minDim
+    const startAngle = -Math.PI / 2
+    const endAngle = 0
+
+    ctx.save()
+
+    ctx.beginPath()
+    ctx.arc(arcCenterX, arcCenterY, radius, startAngle, endAngle)
+    ctx.strokeStyle = linkColor
+    ctx.lineWidth = linkWidth
+    ctx.stroke()
+
+    const arrowSize = 8 * globalScale
+    const arrowAngle = endAngle - Math.PI / 2
+    const endX = arcCenterX + radius * Math.cos(endAngle)
+    const endY = arcCenterY + radius * Math.sin(endAngle)
+
+    ctx.beginPath()
+    ctx.moveTo(endX, endY)
+    ctx.lineTo(
+      endX - arrowSize * Math.cos(arrowAngle - Math.PI / 7),
+      endY - arrowSize * Math.sin(arrowAngle - Math.PI / 7)
+    )
+    ctx.lineTo(
+      endX - arrowSize * Math.cos(arrowAngle + Math.PI / 7),
+      endY - arrowSize * Math.sin(arrowAngle + Math.PI / 7)
+    )
+    ctx.closePath()
+    ctx.fillStyle = linkColor
+    ctx.fill()
+
+    const labelFontSize = Math.max(5, 6 * globalScale)
+    ctx.font = `400 ${labelFontSize}px Inter, -apple-system, sans-serif`
+    ctx.fillStyle = isHighlighted ? "#E2E8F0" : COLORS.textSecondary
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText(link.displayName, arcCenterX, arcCenterY + radius + 15 * globalScale)
+
+    ctx.restore()
+    return
+  }
+
   const dx = tx - sx
   const dy = ty - sy
   const dist = Math.sqrt(dx * dx + dy * dy) || 1

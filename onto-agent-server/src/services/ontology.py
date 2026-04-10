@@ -11,6 +11,16 @@ from src.schemas.ontology import (
     OntologyDetailResponse,
     DataRangeResponse,
 )
+from src.models.ontology import (
+    Ontology,
+    OntologyClass,
+    DataProperty,
+    ObjectProperty,
+    AnnotationProperty,
+    Individual,
+    Axiom,
+    DataRange,
+)
 from src.services.ontology_metadata import OntologyMetadata, get_metadata_store
 
 # Try to import Jena client, fall back gracefully
@@ -47,1171 +57,68 @@ def _get_jena() -> Optional["JenaClient"]:
         return None
 
 
-# Ontology IRI mapping (for Jena)
-ONTOLOGY_IRI_MAP = {
-    "1": "http://onto-agent.com/ontology/customer360#",
-    "2": "http://onto-agent.com/ontology/supplier-network#",
-    "3": "http://onto-agent.com/ontology/order全景#",
-}
 
-MOCK_ONTOLOGIES = [
-    {
-        "id": "1",
-        "name": "客户360",
-        "description": "企业客户全景视图",
-        "status": "published",
-        "base_iri": "http://onto-agent.com/ontology/customer360#",
-        "imports": [],
-        "prefix_mappings": {
-            "owl": "http://www.w3.org/2002/07/owl#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-        },
-        "object_count": 8,
-        "data_property_count": 24,
-        "object_property_count": 12,
-        "individual_count": 150,
-        "axiom_count": 45,
-        "updated_at": "2 小时前",
-        "version": "v2.1",
-        "datasource": "ERP-Production",
-        "created_at": "2024-01-15T10:00:00Z",
-        "updated_at": "2024-03-20T14:30:00Z",
-    },
-    {
-        "id": "2",
-        "name": "供应商网络",
-        "description": "供应商关系与供应链视图",
-        "status": "published",
-        "base_iri": "http://onto-agent.com/ontology/supplier-network#",
-        "imports": [],
-        "prefix_mappings": {},
-        "object_count": 6,
-        "data_property_count": 18,
-        "object_property_count": 8,
-        "individual_count": 80,
-        "axiom_count": 28,
-        "updated_at": "昨天",
-        "version": "v1.3",
-        "datasource": "SCM-SupplyChain",
-        "created_at": "2024-02-01T09:00:00Z",
-        "updated_at": "2024-03-19T11:00:00Z",
-    },
-    {
-        "id": "3",
-        "name": "订单全景",
-        "description": "订单、发票与物流追踪",
-        "status": "draft",
-        "base_iri": "http://onto-agent.com/ontology/order全景#",
-        "imports": ["http://onto-agent.com/ontology/customer360#"],
-        "prefix_mappings": {},
-        "object_count": 5,
-        "data_property_count": 15,
-        "object_property_count": 7,
-        "individual_count": 0,
-        "axiom_count": 12,
-        "updated_at": "3 天前",
-        "version": "v1.2-draft",
-        "datasource": "ERP-Production",
-        "created_at": "2024-02-20T08:00:00Z",
-        "updated_at": "2024-03-17T16:00:00Z",
-    },
-]
 
-ONTOLOGY_DATA: dict[str, dict] = {
-    "1": {
-        "classes": [
-            {
-                "id": "Product",
-                "ontology_id": "1",
-                "name": "Product",
-                "display_name": "产品",
-                "description": "商品或服务实体",
-                "labels": {"zh": "产品", "en": "Product"},
-                "comments": {
-                    "zh": "企业销售的商品或提供的服务",
-                    "en": "Goods or services sold by the company",
-                },
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Order",
-                "ontology_id": "1",
-                "name": "Order",
-                "display_name": "订单",
-                "description": "客户下达的购买订单",
-                "labels": {"zh": "订单", "en": "Order"},
-                "comments": {
-                    "zh": "客户提交的购买请求",
-                    "en": "Purchase request submitted by customer",
-                },
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Customer",
-                "ontology_id": "1",
-                "name": "Customer",
-                "display_name": "客户",
-                "description": "购买商品或服务的个人或企业",
-                "labels": {"zh": "客户", "en": "Customer"},
-                "comments": {
-                    "zh": "企业产品和服务的购买者",
-                    "en": "Purchasers of company products and services",
-                },
-                "equivalent_to": [],
-                "disjoint_with": ["Supplier"],
-                "super_classes": [],
-            },
-            {
-                "id": "Supplier",
-                "ontology_id": "1",
-                "name": "Supplier",
-                "display_name": "供应商",
-                "description": "提供原材料或商品的供应商",
-                "labels": {"zh": "供应商", "en": "Supplier"},
-                "comments": {
-                    "zh": "向企业提供商品或服务的组织",
-                    "en": "Organization providing goods or services to the enterprise",
-                },
-                "equivalent_to": [],
-                "disjoint_with": ["Customer"],
-                "super_classes": [],
-            },
-            {
-                "id": "Shipment",
-                "ontology_id": "1",
-                "name": "Shipment",
-                "display_name": "货运",
-                "description": "订单的发货记录",
-                "labels": {"zh": "货运", "en": "Shipment"},
-                "comments": {
-                    "zh": "订单的配送信息",
-                    "en": "Delivery information for orders",
-                },
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Invoice",
-                "ontology_id": "1",
-                "name": "Invoice",
-                "display_name": "发票",
-                "description": "商业发票记录",
-                "labels": {"zh": "发票", "en": "Invoice"},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Address",
-                "ontology_id": "1",
-                "name": "Address",
-                "display_name": "地址",
-                "description": "物理地址信息",
-                "labels": {"zh": "地址", "en": "Address"},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Payment",
-                "ontology_id": "1",
-                "name": "Payment",
-                "display_name": "支付",
-                "description": "订单支付记录",
-                "labels": {"zh": "支付", "en": "Payment"},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-        ],
-        "data_properties": [
-            {
-                "id": "p1",
-                "ontology_id": "1",
-                "name": "productName",
-                "display_name": "产品名称",
-                "domain_ids": ["Product"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p2",
-                "ontology_id": "1",
-                "name": "price",
-                "display_name": "价格",
-                "domain_ids": ["Product"],
-                "range_type": "decimal",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p3",
-                "ontology_id": "1",
-                "name": "stockLevel",
-                "display_name": "库存数量",
-                "domain_ids": ["Product"],
-                "range_type": "integer",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p4",
-                "ontology_id": "1",
-                "name": "orderDate",
-                "display_name": "订单日期",
-                "domain_ids": ["Order"],
-                "range_type": "dateTime",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p5",
-                "ontology_id": "1",
-                "name": "totalAmount",
-                "display_name": "总金额",
-                "domain_ids": ["Order"],
-                "range_type": "decimal",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p6",
-                "ontology_id": "1",
-                "name": "orderStatus",
-                "display_name": "订单状态",
-                "domain_ids": ["Order"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p7",
-                "ontology_id": "1",
-                "name": "customerName",
-                "display_name": "客户名称",
-                "domain_ids": ["Customer"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p8",
-                "ontology_id": "1",
-                "name": "customerTier",
-                "display_name": "客户等级",
-                "domain_ids": ["Customer"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p9",
-                "ontology_id": "1",
-                "name": "email",
-                "display_name": "邮箱",
-                "domain_ids": ["Customer"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p10",
-                "ontology_id": "1",
-                "name": "phone",
-                "display_name": "电话",
-                "domain_ids": ["Customer"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p11",
-                "ontology_id": "1",
-                "name": "supplierName",
-                "display_name": "供应商名称",
-                "domain_ids": ["Supplier"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p12",
-                "ontology_id": "1",
-                "name": "shipmentDate",
-                "display_name": "发货日期",
-                "domain_ids": ["Shipment"],
-                "range_type": "dateTime",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p13",
-                "ontology_id": "1",
-                "name": "trackingNumber",
-                "display_name": "追踪号",
-                "domain_ids": ["Shipment"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p14",
-                "ontology_id": "1",
-                "name": "invoiceNumber",
-                "display_name": "发票号",
-                "domain_ids": ["Invoice"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p15",
-                "ontology_id": "1",
-                "name": "invoiceAmount",
-                "display_name": "发票金额",
-                "domain_ids": ["Invoice"],
-                "range_type": "decimal",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p16",
-                "ontology_id": "1",
-                "name": "street",
-                "display_name": "街道",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p17",
-                "ontology_id": "1",
-                "name": "city",
-                "display_name": "城市",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p18",
-                "ontology_id": "1",
-                "name": "country",
-                "display_name": "国家",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p19",
-                "ontology_id": "1",
-                "name": "postalCode",
-                "display_name": "邮编",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p20",
-                "ontology_id": "1",
-                "name": "paymentAmount",
-                "display_name": "支付金额",
-                "domain_ids": ["Payment"],
-                "range_type": "decimal",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p21",
-                "ontology_id": "1",
-                "name": "paymentDate",
-                "display_name": "支付日期",
-                "domain_ids": ["Payment"],
-                "range_type": "dateTime",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p22",
-                "ontology_id": "1",
-                "name": "paymentMethod",
-                "display_name": "支付方式",
-                "domain_ids": ["Payment"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p23",
-                "ontology_id": "1",
-                "name": "weight",
-                "display_name": "重量",
-                "domain_ids": ["Product", "Shipment"],
-                "range_type": "double",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p24",
-                "ontology_id": "1",
-                "name": "createdAt",
-                "display_name": "创建时间",
-                "domain_ids": ["Product", "Order", "Customer", "Supplier"],
-                "range_type": "dateTime",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "object_properties": [
-            {
-                "id": "op1",
-                "ontology_id": "1",
-                "name": "hasProduct",
-                "display_name": "包含产品",
-                "domain_ids": ["Order"],
-                "range_ids": ["Product"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": "op6",
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op2",
-                "ontology_id": "1",
-                "name": "placedBy",
-                "display_name": "下单",
-                "domain_ids": ["Order"],
-                "range_ids": ["Customer"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": "op5",
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op3",
-                "ontology_id": "1",
-                "name": "suppliedBy",
-                "display_name": "供应方",
-                "domain_ids": ["Product"],
-                "range_ids": ["Supplier"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op4",
-                "ontology_id": "1",
-                "name": "ships",
-                "display_name": "发货运",
-                "domain_ids": ["Order"],
-                "range_ids": ["Shipment"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op5",
-                "ontology_id": "1",
-                "name": "owns",
-                "display_name": "拥有",
-                "domain_ids": ["Customer"],
-                "range_ids": ["Order"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": "op2",
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op6",
-                "ontology_id": "1",
-                "name": "orderedAs",
-                "display_name": "被订购为",
-                "domain_ids": ["Product"],
-                "range_ids": ["Order"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": "op1",
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op7",
-                "ontology_id": "1",
-                "name": "hasInvoice",
-                "display_name": "包含发票",
-                "domain_ids": ["Order"],
-                "range_ids": ["Invoice"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op8",
-                "ontology_id": "1",
-                "name": "billedTo",
-                "display_name": "开票给",
-                "domain_ids": ["Invoice"],
-                "range_ids": ["Customer"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op9",
-                "ontology_id": "1",
-                "name": "livesAt",
-                "display_name": "住在",
-                "domain_ids": ["Customer"],
-                "range_ids": ["Address"],
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op10",
-                "ontology_id": "1",
-                "name": "locatedAt",
-                "display_name": "位于",
-                "domain_ids": ["Supplier"],
-                "range_ids": ["Address"],
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op11",
-                "ontology_id": "1",
-                "name": "hasPayment",
-                "display_name": "包含支付",
-                "domain_ids": ["Order"],
-                "range_ids": ["Payment"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op12",
-                "ontology_id": "1",
-                "name": "partOf",
-                "display_name": "组成部分",
-                "domain_ids": ["Product"],
-                "range_ids": ["Product"],
-                "characteristics": ["transitive", "reflexive"],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "annotation_properties": [
-            {
-                "id": "ap1",
-                "ontology_id": "1",
-                "name": "creator",
-                "display_name": "创建者",
-                "description": "资源创建者",
-                "domain_ids": [],
-                "range_ids": [],
-                "sub_property_of_id": None,
-            },
-            {
-                "id": "ap2",
-                "ontology_id": "1",
-                "name": "createdDate",
-                "display_name": "创建日期",
-                "description": "资源创建日期",
-                "domain_ids": [],
-                "range_ids": [],
-                "sub_property_of_id": None,
-            },
-            {
-                "id": "ap3",
-                "ontology_id": "1",
-                "name": "modifiedDate",
-                "display_name": "修改日期",
-                "description": "资源最后修改日期",
-                "domain_ids": [],
-                "range_ids": [],
-                "sub_property_of_id": None,
-            },
-            {
-                "id": "ap4",
-                "ontology_id": "1",
-                "name": "seeAlso",
-                "display_name": "参见",
-                "description": "相关资源链接",
-                "domain_ids": [],
-                "range_ids": [],
-                "sub_property_of_id": None,
-            },
-        ],
-        "individuals": [
-            {
-                "id": "ind1",
-                "ontology_id": "1",
-                "name": "customer-001",
-                "display_name": "张三",
-                "description": "VIP客户",
-                "types": ["Customer"],
-                "labels": {},
-                "comments": {},
-                "data_property_assertions": [
-                    {"property_id": "p7", "value": "张三"},
-                    {"property_id": "p8", "value": "VIP"},
-                    {"property_id": "p9", "value": "zhangsan@example.com"},
-                ],
-                "object_property_assertions": [],
-            },
-            {
-                "id": "ind2",
-                "ontology_id": "1",
-                "name": "customer-002",
-                "display_name": "李四",
-                "description": "普通客户",
-                "types": ["Customer"],
-                "labels": {},
-                "comments": {},
-                "data_property_assertions": [
-                    {"property_id": "p7", "value": "李四"},
-                    {"property_id": "p8", "value": "普通"},
-                    {"property_id": "p9", "value": "lisi@example.com"},
-                ],
-                "object_property_assertions": [],
-            },
-            {
-                "id": "ind3",
-                "ontology_id": "1",
-                "name": "product-001",
-                "display_name": "笔记本电脑",
-                "description": "高性能笔记本电脑",
-                "types": ["Product"],
-                "labels": {},
-                "comments": {},
-                "data_property_assertions": [
-                    {"property_id": "p1", "value": "笔记本电脑"},
-                    {"property_id": "p2", "value": 5999.00},
-                ],
-                "object_property_assertions": [],
-            },
-            {
-                "id": "ind4",
-                "ontology_id": "1",
-                "name": "supplier-001",
-                "display_name": "联想集团",
-                "description": "主要供应商",
-                "types": ["Supplier"],
-                "labels": {},
-                "comments": {},
-                "data_property_assertions": [
-                    {"property_id": "p11", "value": "联想集团"}
-                ],
-                "object_property_assertions": [],
-            },
-            {
-                "id": "ind5",
-                "ontology_id": "1",
-                "name": "order-001",
-                "display_name": "订单2024001",
-                "description": "张三的订单",
-                "types": ["Order"],
-                "labels": {},
-                "comments": {},
-                "data_property_assertions": [{"property_id": "p5", "value": 5999.00}],
-                "object_property_assertions": [],
-            },
-        ],
-        "axioms": [
-            {
-                "id": "ax1",
-                "ontology_id": "1",
-                "type": "EquivalentClasses",
-                "subject": None,
-                "assertions": {"classIds": ["Customer"]},
-                "annotations": [],
-            },
-            {
-                "id": "ax2",
-                "ontology_id": "1",
-                "type": "DisjointClasses",
-                "subject": None,
-                "assertions": {"classIds": ["Customer", "Supplier"]},
-                "annotations": [],
-            },
-            {
-                "id": "ax3",
-                "ontology_id": "1",
-                "type": "FunctionalProperty",
-                "subject": "price",
-                "assertions": {},
-                "annotations": [],
-            },
-            {
-                "id": "ax4",
-                "ontology_id": "1",
-                "type": "FunctionalProperty",
-                "subject": "email",
-                "assertions": {},
-                "annotations": [],
-            },
-            {
-                "id": "ax5",
-                "ontology_id": "1",
-                "type": "TransitiveProperty",
-                "subject": "partOf",
-                "assertions": {},
-                "annotations": [],
-            },
-        ],
-        "data_ranges": [
-            {
-                "id": "dr1",
-                "ontology_id": "1",
-                "type": "enumeration",
-                "values": [
-                    "pending",
-                    "processing",
-                    "shipped",
-                    "delivered",
-                    "cancelled",
-                ],
-                "base_type": None,
-                "facets": None,
-            },
-            {
-                "id": "dr2",
-                "ontology_id": "1",
-                "type": "restriction",
-                "values": None,
-                "base_type": "integer",
-                "facets": [{"type": "minInclusive", "value": 0}],
-            },
-        ],
-    },
-    "2": {
-        "classes": [
-            {
-                "id": "Supplier",
-                "ontology_id": "2",
-                "name": "Supplier",
-                "display_name": "供应商",
-                "description": "供应商实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Warehouse",
-                "ontology_id": "2",
-                "name": "Warehouse",
-                "display_name": "仓库",
-                "description": "仓库实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Product",
-                "ontology_id": "2",
-                "name": "Product",
-                "display_name": "产品",
-                "description": "产品实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "RawMaterial",
-                "ontology_id": "2",
-                "name": "RawMaterial",
-                "display_name": "原材料",
-                "description": "原材料",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": ["Product"],
-            },
-            {
-                "id": "Address",
-                "ontology_id": "2",
-                "name": "Address",
-                "display_name": "地址",
-                "description": "物理地址",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-        ],
-        "data_properties": [
-            {
-                "id": "dp1",
-                "ontology_id": "2",
-                "name": "supplierName",
-                "display_name": "供应商名称",
-                "domain_ids": ["Supplier"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "dp2",
-                "ontology_id": "2",
-                "name": "warehouseLocation",
-                "display_name": "仓库位置",
-                "domain_ids": ["Warehouse"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "dp3",
-                "ontology_id": "2",
-                "name": "stockLevel",
-                "display_name": "库存数量",
-                "domain_ids": ["Product"],
-                "range_type": "integer",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "dp4",
-                "ontology_id": "2",
-                "name": "street",
-                "display_name": "街道",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": [],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "dp5",
-                "ontology_id": "2",
-                "name": "city",
-                "display_name": "城市",
-                "domain_ids": ["Address"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "object_properties": [
-            {
-                "id": "op1",
-                "ontology_id": "2",
-                "name": "supplies",
-                "display_name": "供应",
-                "domain_ids": ["Supplier"],
-                "range_ids": ["Product"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op2",
-                "ontology_id": "2",
-                "name": "stores",
-                "display_name": "存储",
-                "domain_ids": ["Warehouse"],
-                "range_ids": ["Product"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op3",
-                "ontology_id": "2",
-                "name": "locatedIn",
-                "display_name": "位于",
-                "domain_ids": ["Supplier", "Warehouse"],
-                "range_ids": ["Address"],
-                "characteristics": ["transitive"],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "annotation_properties": [],
-        "individuals": [],
-        "axioms": [],
-        "data_ranges": [],
-    },
-    "3": {
-        "classes": [
-            {
-                "id": "Order",
-                "ontology_id": "3",
-                "name": "Order",
-                "display_name": "订单",
-                "description": "订单实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Invoice",
-                "ontology_id": "3",
-                "name": "Invoice",
-                "display_name": "发票",
-                "description": "发票实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-            {
-                "id": "Shipment",
-                "ontology_id": "3",
-                "name": "Shipment",
-                "display_name": "货运",
-                "description": "货运实体",
-                "labels": {},
-                "comments": {},
-                "equivalent_to": [],
-                "disjoint_with": [],
-                "super_classes": [],
-            },
-        ],
-        "data_properties": [
-            {
-                "id": "p1",
-                "ontology_id": "3",
-                "name": "orderDate",
-                "display_name": "订单日期",
-                "domain_ids": ["Order"],
-                "range_type": "dateTime",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p2",
-                "ontology_id": "3",
-                "name": "invoiceAmount",
-                "display_name": "发票金额",
-                "domain_ids": ["Invoice"],
-                "range_type": "decimal",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "p3",
-                "ontology_id": "3",
-                "name": "trackingNumber",
-                "display_name": "追踪号",
-                "domain_ids": ["Shipment"],
-                "range_type": "string",
-                "characteristics": ["functional"],
-                "super_property_id": None,
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "object_properties": [
-            {
-                "id": "op1",
-                "ontology_id": "3",
-                "name": "hasInvoice",
-                "display_name": "包含发票",
-                "domain_ids": ["Order"],
-                "range_ids": ["Invoice"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-            {
-                "id": "op2",
-                "ontology_id": "3",
-                "name": "hasShipment",
-                "display_name": "包含货运",
-                "domain_ids": ["Order"],
-                "range_ids": ["Shipment"],
-                "characteristics": [],
-                "super_property_id": None,
-                "inverse_of_id": None,
-                "property_chain": [],
-                "labels": {},
-                "comments": {},
-            },
-        ],
-        "annotation_properties": [],
-        "individuals": [],
-        "axioms": [],
-        "data_ranges": [],
-    },
-}
+
+# ============================================================
+# 本体 CRUD（单一可信源：PostgreSQL）
+# ============================================================
 
 
 async def list_ontologies() -> list[OntologyResponse]:
-    metadata_store = get_metadata_store()
-    result = []
+    from src.database import async_session_maker
+    from sqlalchemy import select, func
 
-    for meta in metadata_store.list_all():
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            try:
-                classes = jena.list_classes(meta.base_iri)
-                data_props = jena.list_datatype_properties(meta.base_iri)
-                obj_props = jena.list_object_properties(meta.base_iri)
-            except Exception:
-                classes = []
-                data_props = []
-                obj_props = []
-        else:
-            classes = []
-            data_props = []
-            obj_props = []
-
-        result.append(
-            OntologyResponse(
-                id=meta.id,
-                name=meta.name,
-                description=meta.description,
-                version=meta.version,
-                status=meta.status,
-                datasource=None,
-                base_iri=meta.base_iri,
-                imports=[],
-                prefix_mappings={
-                    "owl": "http://www.w3.org/2002/07/owl#",
-                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-                    "xsd": "http://www.w3.org/2001/XMLSchema#",
-                },
-                object_count=len(classes),
-                data_property_count=len(data_props),
-                object_property_count=len(obj_props),
-                individual_count=0,
-                axiom_count=0,
-                created_at=meta.created_at,
-                updated_at=meta.updated_at,
-            )
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Ontology).order_by(Ontology.updated_at.desc())
         )
+        ontologies = result.scalars().all()
 
-    return result
+        responses = []
+        for ont in ontologies:
+            class_count = await session.scalar(
+                select(func.count()).select_from(OntologyClass).where(
+                    OntologyClass.ontology_id == ont.id
+                )
+            )
+            dp_count = await session.scalar(
+                select(func.count()).select_from(DataProperty).where(
+                    DataProperty.ontology_id == ont.id
+                )
+            )
+            op_count = await session.scalar(
+                select(func.count()).select_from(ObjectProperty).where(
+                    ObjectProperty.ontology_id == ont.id
+                )
+            )
+
+            responses.append(
+                OntologyResponse(
+                    id=ont.id,
+                    name=ont.name,
+                    description=ont.description or "",
+                    version=ont.version or "v1.0",
+                    status=ont.status or "draft",
+                    datasource=None,
+                    base_iri=ont.base_iri,
+                    imports=[],
+                    prefix_mappings={
+                        "owl": "http://www.w3.org/2002/07/owl#",
+                        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                        "xsd": "http://www.w3.org/2001/XMLSchema#",
+                    },
+                    object_count=class_count or 0,
+                    data_property_count=dp_count or 0,
+                    object_property_count=op_count or 0,
+                    individual_count=0,
+                    axiom_count=0,
+                    created_at=ont.created_at.isoformat() if ont.created_at else "",
+                    updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+                )
+            )
+
+        return responses
 
 
 async def create_ontology(
@@ -1221,32 +128,35 @@ async def create_ontology(
     imports: list = None,
     prefix_mappings: dict = None,
 ) -> OntologyResponse:
-    metadata_store = get_metadata_store()
+    """创建本体：写入 PostgreSQL + metadata store，可选同步 Jena"""
+    from src.database import async_session_maker
 
-    new_id = metadata_store.generate_id()
+    async with async_session_maker() as session:
+        async with session.begin():
+            import uuid
+            new_id = str(uuid.uuid4())[:8]
 
-    if not base_iri:
-        base_iri = f"http://onto-agent.com/ontology/{name}#"
+            if not base_iri:
+                base_iri = f"http://onto-agent.com/ontology/{name}#"
 
-    now = datetime.utcnow().isoformat() + "Z"
-    dataset = metadata_store.generate_dataset(new_id)
+            dataset = f"/ontology_{new_id}"
 
-    jena = get_jena_client()
-    if jena:
-        try:
-            jena.create_dataset(dataset)
-        except Exception as e:
-            print(f"Warning: Failed to create dataset {dataset}: {e}")
-
-    jena_for_new = get_jena_client_for_dataset(dataset)
-    if jena_for_new:
-        try:
-            jena_for_new.create_ontology(
-                name=name, base_iri=base_iri, description=description
+            ontology = Ontology(
+                id=new_id,
+                name=name,
+                description=description,
+                base_iri=base_iri,
+                dataset=dataset,
+                version="v1.0",
+                status="draft",
             )
-        except Exception as e:
-            print(f"Warning: Failed to create ontology in dataset: {e}")
+            session.add(ontology)
 
+        await session.commit()
+
+    # 同时写 metadata store（向后兼容）
+    from datetime import datetime
+    now = datetime.utcnow().isoformat() + "Z"
     metadata = OntologyMetadata(
         id=new_id,
         name=name,
@@ -1258,7 +168,16 @@ async def create_ontology(
         created_at=now,
         updated_at=now,
     )
-    metadata_store.add(metadata)
+    get_metadata_store().add(metadata)
+
+    # 异步创建 Jena dataset（不阻塞响应）
+    try:
+        import asyncio
+        jena = _get_jena()
+        if jena:
+            asyncio.create_task(_sync_jena_dataset(dataset, base_iri, name, description))
+    except Exception:
+        pass
 
     return OntologyResponse(
         id=new_id,
@@ -1269,8 +188,7 @@ async def create_ontology(
         datasource=None,
         base_iri=base_iri,
         imports=imports or [],
-        prefix_mappings=prefix_mappings
-        or {
+        prefix_mappings=prefix_mappings or {
             "owl": "http://www.w3.org/2002/07/owl#",
             "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
             "xsd": "http://www.w3.org/2001/XMLSchema#",
@@ -1285,135 +203,144 @@ async def create_ontology(
     )
 
 
+async def _sync_jena_dataset(dataset: str, base_iri: str, name: str, description: str):
+    """后台任务：创建 Jena dataset 并写入本体头"""
+    try:
+        jena = _get_jena()
+        if not jena:
+            return
+        jena.create_dataset(dataset)
+        ds_jena = get_jena_client_for_dataset(dataset)
+        if ds_jena:
+            ds_jena.create_ontology(name=name, base_iri=base_iri, description=description or "")
+    except Exception as e:
+        print(f"[JenaSync] Failed to create dataset {dataset}: {e}")
+
+
 async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if not meta:
-        return None
+    """获取本体（不含详情实体）"""
+    from src.database import async_session_maker
+    from sqlalchemy import select, func
 
-    jena = get_jena_client_for_dataset(meta.dataset)
-    if jena:
-        try:
-            classes = jena.list_classes(meta.base_iri)
-            data_props = jena.list_datatype_properties(meta.base_iri)
-            obj_props = jena.list_object_properties(meta.base_iri)
-        except Exception:
-            classes = []
-            data_props = []
-            obj_props = []
-    else:
-        classes = []
-        data_props = []
-        obj_props = []
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        ont = result.scalar_one_or_none()
+        if not ont:
+            return None
 
-    return OntologyResponse(
-        id=meta.id,
-        name=meta.name,
-        description=meta.description,
-        version=meta.version,
-        status=meta.status,
-        datasource=None,
-        base_iri=meta.base_iri,
-        imports=[],
-        prefix_mappings={
-            "owl": "http://www.w3.org/2002/07/owl#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-        },
-        object_count=len(classes),
-        data_property_count=len(data_props),
-        object_property_count=len(obj_props),
-        individual_count=0,
-        axiom_count=0,
-        created_at=meta.created_at,
-        updated_at=meta.updated_at,
-    )
+        class_count = await session.scalar(
+            select(func.count()).select_from(OntologyClass).where(OntologyClass.ontology_id == ontology_id)
+        )
+        dp_count = await session.scalar(
+            select(func.count()).select_from(DataProperty).where(DataProperty.ontology_id == ontology_id)
+        )
+        op_count = await session.scalar(
+            select(func.count()).select_from(ObjectProperty).where(ObjectProperty.ontology_id == ontology_id)
+        )
+
+        return OntologyResponse(
+            id=ont.id,
+            name=ont.name,
+            description=ont.description or "",
+            version=ont.version or "v1.0",
+            status=ont.status or "draft",
+            datasource=None,
+            base_iri=ont.base_iri,
+            imports=[],
+            prefix_mappings={
+                "owl": "http://www.w3.org/2002/07/owl#",
+                "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+                "xsd": "http://www.w3.org/2001/XMLSchema#",
+            },
+            object_count=class_count or 0,
+            data_property_count=dp_count or 0,
+            object_property_count=op_count or 0,
+            individual_count=0,
+            axiom_count=0,
+            created_at=ont.created_at.isoformat() if ont.created_at else "",
+            updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+        )
 
 
 async def delete_ontology(ontology_id: str) -> bool:
-    """Delete an ontology"""
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if not meta:
-        return False
+    """删除本体：PostgreSQL + metadata store + Jena dataset"""
+    from src.database import async_session_maker
+    from sqlalchemy import select
 
-    jena = get_jena_client()
-    if jena:
-        try:
-            jena.delete_dataset(meta.dataset)
-        except Exception as e:
-            print(f"Warning: Failed to delete dataset {meta.dataset}: {e}")
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        ont = result.scalar_one_or_none()
+        if not ont:
+            return False
 
-    metadata_store.delete(ontology_id)
+        dataset = ont.dataset
+        await session.delete(ont)
+        await session.commit()
+
+    # 删除 metadata store
+    get_metadata_store().delete(ontology_id)
+
+    # 异步删除 Jena dataset
+    try:
+        import asyncio
+        jena = _get_jena()
+        if jena and dataset:
+            asyncio.create_task(_delete_jena_dataset(dataset))
+    except Exception:
+        pass
+
     return True
 
 
+async def _delete_jena_dataset(dataset: str):
+    """后台任务：删除 Jena dataset"""
+    try:
+        jena = _get_jena()
+        if jena:
+            jena.delete_dataset(dataset)
+    except Exception as e:
+        print(f"[JenaSync] Failed to delete dataset {dataset}: {e}")
+
+
 async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailResponse]:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if not meta:
-        return None
+    from src.database import async_session_maker
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
-    jena = get_jena_client_for_dataset(meta.dataset)
-
-    if jena:
-        try:
-            classes = jena.list_classes(meta.base_iri)
-            data_props = jena.list_datatype_properties(meta.base_iri)
-            obj_props = jena.list_object_properties(meta.base_iri)
-        except Exception:
-            classes = []
-            data_props = []
-            obj_props = []
-    else:
-        classes = []
-        data_props = []
-        obj_props = []
-
-    return OntologyDetailResponse(
-        id=meta.id,
-        name=meta.name,
-        description=meta.description,
-        version=meta.version,
-        status=meta.status,
-        datasource=None,
-        base_iri=meta.base_iri,
-        imports=[],
-        prefix_mappings={
-            "owl": "http://www.w3.org/2002/07/owl#",
-            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-            "xsd": "http://www.w3.org/2001/XMLSchema#",
-        },
-        object_count=len(classes),
-        data_property_count=len(data_props),
-        object_property_count=len(obj_props),
-        individual_count=0,
-        axiom_count=0,
-        created_at=meta.created_at,
-        updated_at=meta.updated_at,
-        classes=classes,
-        data_properties=data_props,
-        object_properties=obj_props,
-        annotation_properties=[],
-        individuals=[],
-        axioms=[],
-        data_ranges=[],
-    )
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Ontology)
+            .where(Ontology.id == ontology_id)
+            .options(
+                selectinload(Ontology.classes),
+                selectinload(Ontology.data_properties),
+                selectinload(Ontology.object_properties),
+                selectinload(Ontology.annotation_properties),
+                selectinload(Ontology.individuals),
+                selectinload(Ontology.axioms),
+                selectinload(Ontology.data_ranges),
+            )
+        )
+        ontology = result.scalar_one_or_none()
+        if not ontology:
+            return None
+        return _build_detail_response(ontology)
 
 
 async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if not meta:
-        return []
+    from src.database import async_session_maker
+    from sqlalchemy import select
 
-    jena = get_jena_client_for_dataset(meta.dataset)
-    if jena:
-        try:
-            return jena.list_classes(meta.base_iri)
-        except Exception:
-            pass
-    return []
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OntologyClass).where(OntologyClass.ontology_id == ontology_id)
+        )
+        classes = result.scalars().all()
+        return [_to_class_response(c) for c in classes]
 
 
 async def create_ontology_class(
@@ -1427,66 +354,144 @@ async def create_ontology_class(
     disjoint_with: list = None,
     super_classes: list = None,
 ) -> OntologyClassResponse:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
+    """创建类：写入 PostgreSQL，异步同步 Jena"""
+    from src.database import async_session_maker
+    import uuid
 
-    if meta:
+    async with async_session_maker() as session:
+        ont_result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        if not ont_result.scalar_one_or_none():
+            raise ValueError(f"Ontology {ontology_id} not found")
+
+        new_class = OntologyClass(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+            labels=labels or {},
+            comments=comments or {},
+            equivalent_to=equivalent_to or [],
+            disjoint_with=disjoint_with or [],
+            super_classes=super_classes or [],
+        )
+        session.add(new_class)
+        await session.commit()
+        await session.refresh(new_class)
+
+    try:
+        import asyncio
+        asyncio.create_task(_sync_class_to_jena(ontology_id, new_class))
+    except Exception:
+        pass
+
+    return _to_class_response(new_class)
+
+
+async def _sync_class_to_jena(ontology_id: str, cls):
+    """后台任务：同步类到 Jena"""
+    try:
+        meta = get_metadata_store().get(ontology_id)
+        if not meta:
+            return
         jena = get_jena_client_for_dataset(meta.dataset)
         if jena:
-            super_class_iris = [f"{meta.base_iri}{sc}" for sc in (super_classes or [])]
-            try:
-                return jena.create_class(
-                    ontology_iri=meta.base_iri,
-                    name=name,
-                    display_name=display_name,
-                    description=description,
-                    super_classes=super_class_iris if super_class_iris else None,
-                )
-            except Exception:
-                pass
-
-    new_class = {
-        "id": name,
-        "ontology_id": ontology_id,
-        "name": name,
-        "display_name": display_name or name,
-        "description": description,
-        "labels": labels or {},
-        "comments": comments or {},
-        "equivalent_to": equivalent_to or [],
-        "disjoint_with": disjoint_with or [],
-        "super_classes": super_classes or [],
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["classes"].append(new_class)
-    return OntologyClassResponse(**new_class)
+            super_iris = [f"{meta.base_iri}{sc}" for sc in (cls.super_classes or [])]
+            jena.create_class(
+                ontology_iri=meta.base_iri,
+                name=cls.name,
+                display_name=cls.display_name,
+                description=cls.description,
+                super_classes=super_iris if super_iris else None,
+            )
+    except Exception as e:
+        print(f"[JenaSync] Failed to sync class {cls.id}: {e}")
 
 
-def _init_ontology_data(ontology_id: str):
-    ONTOLOGY_DATA[ontology_id] = {
-        "classes": [],
-        "data_properties": [],
-        "object_properties": [],
-        "annotation_properties": [],
-        "individuals": [],
-        "axioms": [],
-        "data_ranges": [],
-    }
+async def update_ontology_class(
+    ontology_id: str,
+    class_id: str,
+    name: str = None,
+    display_name: str = None,
+    description: str = None,
+    labels: dict = None,
+    comments: dict = None,
+    equivalent_to: list = None,
+    disjoint_with: list = None,
+    super_classes: list = None,
+) -> Optional[OntologyClassResponse]:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OntologyClass).where(
+                OntologyClass.id == class_id,
+                OntologyClass.ontology_id == ontology_id,
+            )
+        )
+        cls = result.scalar_one_or_none()
+        if not cls:
+            return None
+
+        if name is not None:
+            cls.name = name
+        if display_name is not None:
+            cls.display_name = display_name
+        if description is not None:
+            cls.description = description
+        if labels is not None:
+            cls.labels = labels
+        if comments is not None:
+            cls.comments = comments
+        if equivalent_to is not None:
+            cls.equivalent_to = equivalent_to
+        if disjoint_with is not None:
+            cls.disjoint_with = disjoint_with
+        if super_classes is not None:
+            cls.super_classes = super_classes
+
+        await session.commit()
+        await session.refresh(cls)
+        return _to_class_response(cls)
+
+
+async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(OntologyClass).where(
+                OntologyClass.id == class_id,
+                OntologyClass.ontology_id == ontology_id,
+            )
+        )
+        cls = result.scalar_one_or_none()
+        if not cls:
+            return False
+        await session.delete(cls)
+        await session.commit()
+        return True
+
+
+# ============================================================
+# DataProperty CRUD
+# ============================================================
 
 
 async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if meta:
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            try:
-                return jena.list_datatype_properties(meta.base_iri)
-            except Exception:
-                pass
-    data = ONTOLOGY_DATA.get(ontology_id, {"data_properties": []})
-    return [DataPropertyResponse(**p) for p in data["data_properties"]]
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DataProperty).where(DataProperty.ontology_id == ontology_id)
+        )
+        props = result.scalars().all()
+        return [_to_dataprop_response(p) for p in props]
 
 
 async def create_data_property(
@@ -1499,56 +504,140 @@ async def create_data_property(
     characteristics: list = None,
     super_property_id: str = None,
 ) -> DataPropertyResponse:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
+    from src.database import async_session_maker
+    import uuid
 
-    if meta:
+    async with async_session_maker() as session:
+        ont_result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        if not ont_result.scalar_one_or_none():
+            raise ValueError(f"Ontology {ontology_id} not found")
+
+        new_prop = DataProperty(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+            labels={},
+            comments={},
+            domain_ids=domain_ids,
+            range_type=range_type,
+            characteristics=characteristics or [],
+            super_property_id=super_property_id,
+        )
+        session.add(new_prop)
+        await session.commit()
+        await session.refresh(new_prop)
+
+    try:
+        import asyncio
+        asyncio.create_task(_sync_dataprop_to_jena(ontology_id, new_prop))
+    except Exception:
+        pass
+
+    return _to_dataprop_response(new_prop)
+
+
+async def _sync_dataprop_to_jena(ontology_id: str, prop):
+    try:
+        meta = get_metadata_store().get(ontology_id)
+        if not meta or not prop.domain_ids:
+            return
         jena = get_jena_client_for_dataset(meta.dataset)
-        if jena and domain_ids:
-            domain_iri = f"{meta.base_iri}{domain_ids[0]}"
-            try:
-                return jena.create_datatype_property(
-                    ontology_iri=meta.base_iri,
-                    name=name,
-                    domain_iri=domain_iri,
-                    range_type=range_type,
-                    display_name=display_name,
-                    characteristics=characteristics,
-                )
-            except Exception:
-                pass
+        if jena:
+            jena.create_datatype_property(
+                ontology_iri=meta.base_iri,
+                name=prop.name,
+                domain_iri=f"{meta.base_iri}{prop.domain_ids[0]}",
+                range_type=prop.range_type,
+                display_name=prop.display_name,
+                characteristics=prop.characteristics,
+            )
+    except Exception as e:
+        print(f"[JenaSync] Failed to sync data property {prop.id}: {e}")
 
-    new_prop = {
-        "id": f"dp-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('data_properties', [])) + 1}",
-        "ontology_id": ontology_id,
-        "name": name,
-        "display_name": display_name or name,
-        "description": description,
-        "labels": {},
-        "comments": {},
-        "domain_ids": domain_ids,
-        "range_type": range_type,
-        "characteristics": characteristics or [],
-        "super_property_id": super_property_id,
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["data_properties"].append(new_prop)
-    return DataPropertyResponse(**new_prop)
+
+async def update_data_property(
+    ontology_id: str,
+    prop_id: str,
+    name: str = None,
+    display_name: str = None,
+    description: str = None,
+    domain_ids: list = None,
+    range_type: str = None,
+    characteristics: list = None,
+    super_property_id: str = None,
+) -> Optional[DataPropertyResponse]:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DataProperty).where(
+                DataProperty.id == prop_id,
+                DataProperty.ontology_id == ontology_id,
+            )
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return None
+
+        if name is not None:
+            prop.name = name
+        if display_name is not None:
+            prop.display_name = display_name
+        if description is not None:
+            prop.description = description
+        if domain_ids is not None:
+            prop.domain_ids = domain_ids
+        if range_type is not None:
+            prop.range_type = range_type
+        if characteristics is not None:
+            prop.characteristics = characteristics
+        if super_property_id is not None:
+            prop.super_property_id = super_property_id
+
+        await session.commit()
+        await session.refresh(prop)
+        return _to_dataprop_response(prop)
+
+
+async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DataProperty).where(
+                DataProperty.id == prop_id,
+                DataProperty.ontology_id == ontology_id,
+            )
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return False
+        await session.delete(prop)
+        await session.commit()
+        return True
+
+
+# ============================================================
+# ObjectProperty CRUD
+# ============================================================
 
 
 async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
-    if meta:
-        jena = get_jena_client_for_dataset(meta.dataset)
-        if jena:
-            try:
-                return jena.list_object_properties(meta.base_iri)
-            except Exception:
-                pass
-    data = ONTOLOGY_DATA.get(ontology_id, {"object_properties": []})
-    return [ObjectPropertyResponse(**p) for p in data["object_properties"]]
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(ObjectProperty).where(ObjectProperty.ontology_id == ontology_id)
+        )
+        props = result.scalars().all()
+        return [_to_objprop_response(p) for p in props]
 
 
 async def create_object_property(
@@ -1563,55 +652,150 @@ async def create_object_property(
     inverse_of_id: str = None,
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
-    metadata_store = get_metadata_store()
-    meta = metadata_store.get(ontology_id)
+    from src.database import async_session_maker
+    import uuid
 
-    if meta:
+    async with async_session_maker() as session:
+        ont_result = await session.execute(
+            select(Ontology).where(Ontology.id == ontology_id)
+        )
+        if not ont_result.scalar_one_or_none():
+            raise ValueError(f"Ontology {ontology_id} not found")
+
+        new_prop = ObjectProperty(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+            labels={},
+            comments={},
+            domain_ids=domain_ids,
+            range_ids=range_ids,
+            characteristics=characteristics or [],
+            super_property_id=super_property_id,
+            inverse_of_id=inverse_of_id,
+            property_chain=property_chain or [],
+        )
+        session.add(new_prop)
+        await session.commit()
+        await session.refresh(new_prop)
+
+    try:
+        import asyncio
+        asyncio.create_task(_sync_objprop_to_jena(ontology_id, new_prop))
+    except Exception:
+        pass
+
+    return _to_objprop_response(new_prop)
+
+
+async def _sync_objprop_to_jena(ontology_id: str, prop):
+    try:
+        meta = get_metadata_store().get(ontology_id)
+        if not meta or not prop.domain_ids or not prop.range_ids:
+            return
         jena = get_jena_client_for_dataset(meta.dataset)
-        if jena and domain_ids and range_ids:
-            domain_iri = f"{meta.base_iri}{domain_ids[0]}"
-            range_iri = f"{meta.base_iri}{range_ids[0]}"
-            try:
-                return jena.create_object_property(
-                    ontology_iri=meta.base_iri,
-                    name=name,
-                    domain_iri=domain_iri,
-                    range_iri=range_iri,
-                    display_name=display_name,
-                    characteristics=characteristics,
-                    inverse_of=f"{meta.base_iri}{inverse_of_id}"
-                    if inverse_of_id
-                    else None,
-                )
-            except Exception:
-                pass
-
-    new_prop = {
-        "id": f"op-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('object_properties', [])) + 1}",
-        "ontology_id": ontology_id,
-        "name": name,
-        "display_name": display_name or name,
-        "description": description,
-        "labels": {},
-        "comments": {},
-        "domain_ids": domain_ids,
-        "range_ids": range_ids,
-        "characteristics": characteristics or [],
-        "super_property_id": super_property_id,
-        "inverse_of_id": inverse_of_id,
-        "property_chain": property_chain or [],
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["object_properties"].append(new_prop)
-    return ObjectPropertyResponse(**new_prop)
+        if jena:
+            inverse_of = f"{meta.base_iri}{prop.inverse_of_id}" if prop.inverse_of_id else None
+            jena.create_object_property(
+                ontology_iri=meta.base_iri,
+                name=prop.name,
+                domain_iri=f"{meta.base_iri}{prop.domain_ids[0]}",
+                range_iri=f"{meta.base_iri}{prop.range_ids[0]}",
+                display_name=prop.display_name,
+                characteristics=prop.characteristics,
+                inverse_of=inverse_of,
+            )
+    except Exception as e:
+        print(f"[JenaSync] Failed to sync object property {prop.id}: {e}")
 
 
-async def get_annotation_properties(
+async def update_object_property(
     ontology_id: str,
-) -> list[AnnotationPropertyResponse]:
-    data = ONTOLOGY_DATA.get(ontology_id, {"annotation_properties": []})
-    return [AnnotationPropertyResponse(**p) for p in data["annotation_properties"]]
+    prop_id: str,
+    name: str = None,
+    display_name: str = None,
+    description: str = None,
+    domain_ids: list = None,
+    range_ids: list = None,
+    characteristics: list = None,
+    super_property_id: str = None,
+    inverse_of_id: str = None,
+    property_chain: list = None,
+) -> Optional[ObjectPropertyResponse]:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(ObjectProperty).where(
+                ObjectProperty.id == prop_id,
+                ObjectProperty.ontology_id == ontology_id,
+            )
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return None
+
+        if name is not None:
+            prop.name = name
+        if display_name is not None:
+            prop.display_name = display_name
+        if description is not None:
+            prop.description = description
+        if domain_ids is not None:
+            prop.domain_ids = domain_ids
+        if range_ids is not None:
+            prop.range_ids = range_ids
+        if characteristics is not None:
+            prop.characteristics = characteristics
+        if super_property_id is not None:
+            prop.super_property_id = super_property_id
+        if inverse_of_id is not None:
+            prop.inverse_of_id = inverse_of_id
+        if property_chain is not None:
+            prop.property_chain = property_chain
+
+        await session.commit()
+        await session.refresh(prop)
+        return _to_objprop_response(prop)
+
+
+async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(ObjectProperty).where(
+                ObjectProperty.id == prop_id,
+                ObjectProperty.ontology_id == ontology_id,
+            )
+        )
+        prop = result.scalar_one_or_none()
+        if not prop:
+            return False
+        await session.delete(prop)
+        await session.commit()
+        return True
+
+
+# ============================================================
+# AnnotationProperty CRUD
+# ============================================================
+
+
+async def get_annotation_properties(ontology_id: str) -> list[AnnotationPropertyResponse]:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(AnnotationProperty).where(AnnotationProperty.ontology_id == ontology_id)
+        )
+        props = result.scalars().all()
+        return [_to_annprop_response(p) for p in props]
 
 
 async def create_annotation_property(
@@ -1623,25 +807,43 @@ async def create_annotation_property(
     range_ids: list = None,
     sub_property_of_id: str = None,
 ) -> AnnotationPropertyResponse:
-    new_prop = {
-        "id": f"ap-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('annotation_properties', [])) + 1}",
-        "ontology_id": ontology_id,
-        "name": name,
-        "display_name": display_name or name,
-        "description": description,
-        "domain_ids": domain_ids or [],
-        "range_ids": range_ids or [],
-        "sub_property_of_id": sub_property_of_id,
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["annotation_properties"].append(new_prop)
-    return AnnotationPropertyResponse(**new_prop)
+    from src.database import async_session_maker
+    import uuid
+
+    async with async_session_maker() as session:
+        new_prop = AnnotationProperty(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+            labels={},
+            comments={},
+            domain_ids=domain_ids or [],
+            range_ids=range_ids or [],
+            sub_property_of_id=sub_property_of_id,
+        )
+        session.add(new_prop)
+        await session.commit()
+        await session.refresh(new_prop)
+        return _to_annprop_response(new_prop)
+
+
+# ============================================================
+# Individual CRUD
+# ============================================================
 
 
 async def get_individuals(ontology_id: str) -> list[IndividualResponse]:
-    data = ONTOLOGY_DATA.get(ontology_id, {"individuals": []})
-    return [IndividualResponse(**i) for i in data["individuals"]]
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Individual).where(Individual.ontology_id == ontology_id)
+        )
+        individuals = result.scalars().all()
+        return [_to_individual_response(i) for i in individuals]
 
 
 async def create_individual(
@@ -1655,27 +857,43 @@ async def create_individual(
     data_property_assertions: list = None,
     object_property_assertions: list = None,
 ) -> IndividualResponse:
-    new_ind = {
-        "id": f"ind-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('individuals', [])) + 1}",
-        "ontology_id": ontology_id,
-        "name": name,
-        "display_name": display_name or name,
-        "description": description,
-        "types": types or [],
-        "labels": labels or {},
-        "comments": comments or {},
-        "data_property_assertions": data_property_assertions or [],
-        "object_property_assertions": object_property_assertions or [],
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["individuals"].append(new_ind)
-    return IndividualResponse(**new_ind)
+    from src.database import async_session_maker
+    import uuid
+
+    async with async_session_maker() as session:
+        new_ind = Individual(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+            types=types or [],
+            labels=labels or {},
+            comments=comments or {},
+            data_property_assertions=data_property_assertions or [],
+            object_property_assertions=object_property_assertions or [],
+        )
+        session.add(new_ind)
+        await session.commit()
+        await session.refresh(new_ind)
+        return _to_individual_response(new_ind)
+
+
+# ============================================================
+# Axiom CRUD
+# ============================================================
 
 
 async def get_axioms(ontology_id: str) -> list[AxiomResponse]:
-    data = ONTOLOGY_DATA.get(ontology_id, {"axioms": []})
-    return [AxiomResponse(**a) for a in data["axioms"]]
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Axiom).where(Axiom.ontology_id == ontology_id)
+        )
+        axioms = result.scalars().all()
+        return [_to_axiom_response(a) for a in axioms]
 
 
 async def create_axiom(
@@ -1685,20 +903,319 @@ async def create_axiom(
     assertions: dict = None,
     annotations: list = None,
 ) -> AxiomResponse:
-    new_axiom = {
-        "id": f"ax-{len(ONTOLOGY_DATA.get(ontology_id, {}).get('axioms', [])) + 1}",
-        "ontology_id": ontology_id,
-        "type": axiom_type,
-        "subject": subject,
-        "assertions": assertions or {},
-        "annotations": annotations or [],
-    }
-    if ontology_id not in ONTOLOGY_DATA:
-        _init_ontology_data(ontology_id)
-    ONTOLOGY_DATA[ontology_id]["axioms"].append(new_axiom)
-    return AxiomResponse(**new_axiom)
+    from src.database import async_session_maker
+    import uuid
+
+    async with async_session_maker() as session:
+        new_axiom = Axiom(
+            id=str(uuid.uuid4())[:12],
+            ontology_id=ontology_id,
+            type=axiom_type,
+            subject=subject,
+            assertions=assertions or {},
+            annotations=annotations or [],
+        )
+        session.add(new_axiom)
+        await session.commit()
+        await session.refresh(new_axiom)
+        return _to_axiom_response(new_axiom)
+
+
+# ============================================================
+# DataRange CRUD
+# ============================================================
 
 
 async def get_data_ranges(ontology_id: str) -> list[DataRangeResponse]:
-    data = ONTOLOGY_DATA.get(ontology_id, {"data_ranges": []})
-    return [DataRangeResponse(**d) for d in data["data_ranges"]]
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DataRange).where(DataRange.ontology_id == ontology_id)
+        )
+        ranges = result.scalars().all()
+        return [_to_datarange_response(r) for r in ranges]
+
+
+# ============================================================
+# ORM → Response 模型转换（辅助函数）
+# ============================================================
+
+
+def _build_detail_response(ont: Ontology) -> OntologyDetailResponse:
+    return OntologyDetailResponse(
+        id=ont.id,
+        name=ont.name,
+        description=ont.description or "",
+        version=ont.version or "v1.0",
+        status=ont.status or "draft",
+        datasource=None,
+        base_iri=ont.base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=len(ont.classes) if ont.classes else 0,
+        data_property_count=len(ont.data_properties) if ont.data_properties else 0,
+        object_property_count=len(ont.object_properties) if ont.object_properties else 0,
+        individual_count=len(ont.individuals) if ont.individuals else 0,
+        axiom_count=len(ont.axioms) if ont.axioms else 0,
+        created_at=ont.created_at.isoformat() if ont.created_at else "",
+        updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+        classes=[_to_class_response(c) for c in (ont.classes or [])],
+        data_properties=[_to_dataprop_response(p) for p in (ont.data_properties or [])],
+        object_properties=[_to_objprop_response(p) for p in (ont.object_properties or [])],
+        annotation_properties=[_to_annprop_response(p) for p in (ont.annotation_properties or [])],
+        individuals=[_to_individual_response(i) for i in (ont.individuals or [])],
+        axioms=[_to_axiom_response(a) for a in (ont.axioms or [])],
+        data_ranges=[_to_datarange_response(d) for d in (ont.data_ranges or [])],
+    )
+
+
+def _to_class_response(c) -> OntologyClassResponse:
+    return OntologyClassResponse(
+        id=c.id,
+        ontology_id=c.ontology_id,
+        name=c.name,
+        display_name=c.display_name,
+        description=c.description,
+        labels=c.labels if isinstance(c.labels, dict) else {},
+        comments=c.comments if isinstance(c.comments, dict) else {},
+        equivalent_to=c.equivalent_to if isinstance(c.equivalent_to, list) else [],
+        disjoint_with=c.disjoint_with if isinstance(c.disjoint_with, list) else [],
+        super_classes=c.super_classes if isinstance(c.super_classes, list) else [],
+    )
+
+
+def _to_dataprop_response(p) -> DataPropertyResponse:
+    return DataPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        labels=p.labels if isinstance(p.labels, dict) else {},
+        comments=p.comments if isinstance(p.comments, dict) else {},
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_type=p.range_type or "string",
+        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
+        super_property_id=p.super_property_id,
+    )
+
+
+def _to_objprop_response(p) -> ObjectPropertyResponse:
+    return ObjectPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        labels=p.labels if isinstance(p.labels, dict) else {},
+        comments=p.comments if isinstance(p.comments, dict) else {},
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
+        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
+        super_property_id=p.super_property_id,
+        inverse_of_id=p.inverse_of_id,
+        property_chain=p.property_chain if isinstance(p.property_chain, list) else [],
+    )
+
+
+def _to_annprop_response(p) -> AnnotationPropertyResponse:
+    return AnnotationPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
+        sub_property_of_id=p.sub_property_of_id,
+    )
+
+
+def _to_individual_response(i) -> IndividualResponse:
+    return IndividualResponse(
+        id=i.id,
+        ontology_id=i.ontology_id,
+        name=i.name,
+        display_name=i.display_name,
+        description=i.description,
+        types=i.types if isinstance(i.types, list) else [],
+        labels=i.labels if isinstance(i.labels, dict) else {},
+        comments=i.comments if isinstance(i.comments, dict) else {},
+        data_property_assertions=i.data_property_assertions if isinstance(i.data_property_assertions, list) else [],
+        object_property_assertions=i.object_property_assertions if isinstance(i.object_property_assertions, list) else [],
+    )
+
+
+def _to_axiom_response(a) -> AxiomResponse:
+    return AxiomResponse(
+        id=a.id,
+        ontology_id=a.ontology_id,
+        type=a.type,
+        subject=a.subject,
+        assertions=a.assertions if isinstance(a.assertions, dict) else {},
+        annotations=a.annotations if isinstance(a.annotations, list) else [],
+    )
+
+
+def _to_datarange_response(d) -> DataRangeResponse:
+    return DataRangeResponse(
+        id=d.id,
+        ontology_id=d.ontology_id,
+        type=d.type,
+        values=d.values,
+        base_type=d.base_type,
+        facets=d.facets,
+    )
+
+async def get_data_ranges(ontology_id: str) -> list[DataRangeResponse]:
+    from src.database import async_session_maker
+    from sqlalchemy import select
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(DataRange).where(DataRange.ontology_id == ontology_id)
+        )
+        ranges = result.scalars().all()
+        return [_to_datarange_response(r) for r in ranges]
+
+
+# ============================================================
+# ORM → Response 模型转换（辅助函数）
+# ============================================================
+
+
+def _build_detail_response(ont: Ontology) -> OntologyDetailResponse:
+    return OntologyDetailResponse(
+        id=ont.id,
+        name=ont.name,
+        description=ont.description or "",
+        version=ont.version or "v1.0",
+        status=ont.status or "draft",
+        datasource=None,
+        base_iri=ont.base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=len(ont.classes) if ont.classes else 0,
+        data_property_count=len(ont.data_properties) if ont.data_properties else 0,
+        object_property_count=len(ont.object_properties) if ont.object_properties else 0,
+        individual_count=len(ont.individuals) if ont.individuals else 0,
+        axiom_count=len(ont.axioms) if ont.axioms else 0,
+        created_at=ont.created_at.isoformat() if ont.created_at else "",
+        updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
+        classes=[_to_class_response(c) for c in (ont.classes or [])],
+        data_properties=[_to_dataprop_response(p) for p in (ont.data_properties or [])],
+        object_properties=[_to_objprop_response(p) for p in (ont.object_properties or [])],
+        annotation_properties=[_to_annprop_response(p) for p in (ont.annotation_properties or [])],
+        individuals=[_to_individual_response(i) for i in (ont.individuals or [])],
+        axioms=[_to_axiom_response(a) for a in (ont.axioms or [])],
+        data_ranges=[_to_datarange_response(d) for d in (ont.data_ranges or [])],
+    )
+
+
+def _to_class_response(c) -> OntologyClassResponse:
+    return OntologyClassResponse(
+        id=c.id,
+        ontology_id=c.ontology_id,
+        name=c.name,
+        display_name=c.display_name,
+        description=c.description,
+        labels=c.labels if isinstance(c.labels, dict) else {},
+        comments=c.comments if isinstance(c.comments, dict) else {},
+        equivalent_to=c.equivalent_to if isinstance(c.equivalent_to, list) else [],
+        disjoint_with=c.disjoint_with if isinstance(c.disjoint_with, list) else [],
+        super_classes=c.super_classes if isinstance(c.super_classes, list) else [],
+    )
+
+
+def _to_dataprop_response(p) -> DataPropertyResponse:
+    return DataPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        labels=p.labels if isinstance(p.labels, dict) else {},
+        comments=p.comments if isinstance(p.comments, dict) else {},
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_type=p.range_type or "string",
+        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
+        super_property_id=p.super_property_id,
+    )
+
+
+def _to_objprop_response(p) -> ObjectPropertyResponse:
+    return ObjectPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        labels=p.labels if isinstance(p.labels, dict) else {},
+        comments=p.comments if isinstance(p.comments, dict) else {},
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
+        characteristics=p.characteristics if isinstance(p.characteristics, list) else [],
+        super_property_id=p.super_property_id,
+        inverse_of_id=p.inverse_of_id,
+        property_chain=p.property_chain if isinstance(p.property_chain, list) else [],
+    )
+
+
+def _to_annprop_response(p) -> AnnotationPropertyResponse:
+    return AnnotationPropertyResponse(
+        id=p.id,
+        ontology_id=p.ontology_id,
+        name=p.name,
+        display_name=p.display_name,
+        description=p.description,
+        domain_ids=p.domain_ids if isinstance(p.domain_ids, list) else [],
+        range_ids=p.range_ids if isinstance(p.range_ids, list) else [],
+        sub_property_of_id=p.sub_property_of_id,
+    )
+
+
+def _to_individual_response(i) -> IndividualResponse:
+    return IndividualResponse(
+        id=i.id,
+        ontology_id=i.ontology_id,
+        name=i.name,
+        display_name=i.display_name,
+        description=i.description,
+        types=i.types if isinstance(i.types, list) else [],
+        labels=i.labels if isinstance(i.labels, dict) else {},
+        comments=i.comments if isinstance(i.comments, dict) else {},
+        data_property_assertions=i.data_property_assertions if isinstance(i.data_property_assertions, list) else [],
+        object_property_assertions=i.object_property_assertions if isinstance(i.object_property_assertions, list) else [],
+    )
+
+
+def _to_axiom_response(a) -> AxiomResponse:
+    return AxiomResponse(
+        id=a.id,
+        ontology_id=a.ontology_id,
+        type=a.type,
+        subject=a.subject,
+        assertions=a.assertions if isinstance(a.assertions, dict) else {},
+        annotations=a.annotations if isinstance(a.annotations, list) else [],
+    )
+
+
+def _to_datarange_response(d) -> DataRangeResponse:
+    return DataRangeResponse(
+        id=d.id,
+        ontology_id=d.ontology_id,
+        type=d.type,
+        values=d.values,
+        base_type=d.base_type,
+        facets=d.facets,
+    )

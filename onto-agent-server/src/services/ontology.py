@@ -185,12 +185,22 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
         )
 
     # 从 Jena 批量读取
-    detail = jena.get_ontology_detail(base_iri)
+    try:
+        classes = jena.list_classes(base_iri)
+        data_properties = jena.list_data_properties(base_iri)
+        object_properties = jena.list_object_properties(base_iri)
+        individuals = jena.list_individuals(base_iri)
+    except Exception as e:
+        logger.warning(f"get_ontology_detail Jena error: {e}")
+        classes = []
+        data_properties = []
+        object_properties = []
+        individuals = []
 
     return OntologyDetailResponse(
         id=ont.id,
-        name=detail.get("name", ont.name),
-        description=detail.get("description", ont.description or ""),
+        name=ont.name,
+        description=ont.description or "",
         version=ont.version or "v1.0",
         status=ont.status or "draft",
         datasource=None,
@@ -201,18 +211,18 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
             "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
             "xsd": "http://www.w3.org/2001/XMLSchema#",
         },
-        object_count=len(detail.get("classes", [])),
-        data_property_count=len(detail.get("data_properties", [])),
-        object_property_count=len(detail.get("object_properties", [])),
-        individual_count=len(detail.get("individuals", [])),
+        object_count=len(classes),
+        data_property_count=len(data_properties),
+        object_property_count=len(object_properties),
+        individual_count=len(individuals),
         axiom_count=0,
         created_at=ont.created_at.isoformat() if ont.created_at else "",
         updated_at=ont.updated_at.isoformat() if ont.updated_at else "",
-        classes=detail.get("classes", []),
-        data_properties=detail.get("data_properties", []),
-        object_properties=detail.get("object_properties", []),
-        annotation_properties=detail.get("annotation_properties", []),
-        individuals=detail.get("individuals", []),
+        classes=classes,
+        data_properties=data_properties,
+        object_properties=object_properties,
+        annotation_properties=[],
+        individuals=individuals,
         axioms=[],
         data_ranges=[],
     )

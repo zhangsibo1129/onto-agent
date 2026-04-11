@@ -71,40 +71,70 @@ async def get_ontology_detail(ontology_id: str):
 @router.get("/{ontology_id}/versions")
 async def list_versions(ontology_id: str):
     """获取版本列表"""
-    # TODO: 实现版本列表
-    return success_response([])
+    versions = await ontology_service.list_versions(ontology_id)
+    return success_response(versions)
 
 
 @router.post("/{ontology_id}/versions")
-async def create_version(ontology_id: str, change_log: list[dict] = None):
-    """创建版本"""
-    # TODO: 实现版本创建
-    return success_response({"version": "v1.0"})
+async def create_version(ontology_id: str, data: dict):
+    """创建版本快照"""
+    version = data.get("version")
+    description = data.get("description")
+    change_log = data.get("change_log")
+    if not version:
+        return {"success": False, "error": "version is required"}
+    result = await ontology_service.create_version(
+        ontology_id=ontology_id,
+        version=version,
+        description=description,
+        change_log=change_log,
+    )
+    return success_response(result)
 
 
 @router.get("/{ontology_id}/versions/{version}")
 async def get_version(ontology_id: str, version: str):
-    """获取特定版本"""
-    # TODO: 实现版本获取
-    return success_response({"version": version})
+    """获取特定版本的详细内容"""
+    try:
+        result = await ontology_service.get_version(ontology_id, version)
+        return success_response(result)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 @router.post("/{ontology_id}/rollback")
-async def rollback_version(ontology_id: str, target_version: str):
+async def rollback_version(ontology_id: str, data: dict):
     """回滚到指定版本"""
-    # TODO: 实现回滚
-    return success_response({"success": True})
+    target_version = data.get("target_version") or data.get("version")
+    if not target_version:
+        return {"success": False, "error": "target_version is required"}
+    ok = await ontology_service.rollback_version(ontology_id, target_version)
+    return success_response({"success": ok})
 
 
 @router.get("/{ontology_id}/versions/compare")
 async def compare_versions(ontology_id: str, from_ver: str, to_ver: str):
     """对比两个版本"""
-    # TODO: 实现版本对比
-    return success_response({})
+    result = await ontology_service.compare_versions(ontology_id, from_ver, to_ver)
+    return success_response(result)
 
 
 @router.post("/{ontology_id}/publish")
 async def publish_ontology(ontology_id: str):
-    """发布本体"""
-    # TODO: 实现发布
-    return success_response({"success": True})
+    """发布本体（锁定 TBox）"""
+    ok = await ontology_service.publish_ontology(ontology_id)
+    return success_response({"success": ok})
+
+
+@router.post("/{ontology_id}/unpublish")
+async def unpublish_ontology(ontology_id: str):
+    """取消发布（改为草稿状态）"""
+    ok = await ontology_service.unpublish_ontology(ontology_id)
+    return success_response({"success": ok})
+
+
+@router.delete("/{ontology_id}/versions/{version}")
+async def delete_version(ontology_id: str, version: str):
+    """删除指定版本快照"""
+    ok = await ontology_service.delete_version(ontology_id, version)
+    return success_response({"success": ok})

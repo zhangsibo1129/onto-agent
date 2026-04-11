@@ -1026,3 +1026,344 @@ async def _decrement_count(ontology_id: str, count_field: str):
             .values({count_field: new_val})
         )
         await session.commit()
+
+
+# =============================================================================
+# Version Management
+# =============================================================================
+
+async def list_versions(ontology_id: str) -> list[dict]:
+    """
+    列出本体的所有版本（包括快照信息）
+
+    Returns:
+        list[dict]: 版本列表，每项包含 version, status, created_at, description, change_log, triple_count
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return []
+
+    jena = get_jena_client(dataset)
+    meta_graph = f"{base_iri}/meta"
+
+    # 查询 meta 图中的版本元数据
+    q = f"""
+    PREFIX onto: <http://onto-agent.com/ontology/vocab#>
+    PREFIX dc: <http://purl.org/dc/terms/>
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+    SELECT ?versionLabel ?status ?createdAt ?description ?changeLog
+    WHERE {{
+        GRAPH <{meta_graph}> {{
+            ?v a onto:Version .
+            ?v onto:versionLabel ?versionLabel .
+            OPTIONAL {{ ?v onto:status ?status . }}
+            OPTIONAL {{ ?v dc:created ?createdAt . }}
+            OPTIONAL {{ ?v onto:description ?description . }}
+            OPTIONAL {{ ?v onto:changeLog ?changeLog . }}
+        }}
+    }}
+    ORDER BY DESC(?createdAt)
+    """
+
+    try:
+        rows = jena._query(q)
+    except Exception:
+        rows = []
+
+    # 获取 Jena 中的快照列表
+    snapshots = jena.list_version_snapshots(base_iri)
+    snapshot_map = {s["version"]: s for s in snapshots}
+
+    # 合并元数据 + 快照信息
+    versions = []
+    for row in rows:
+        label = row.get("versionLabel", "")
+        snap = snapshot_map.get(label, {})
+        versions.append({
+            "version": label,
+            "status": row.get("status", "draft"),
+            "created_at": row.get("createdAt", ""),
+            "description": row.get("description", ""),
+            "change_log": _parse_json(row.get("changeLog", "[]")),
+            "triple_count": snap.get("triple_count", 0),
+            "is_snapshot": True,
+        })
+        # 从 snapshot_map 中移除已处理的
+        snapshot_map.pop(label, None)
+
+    # 剩余的快照（无元数据）
+    for label, snap in snapshot_map.items():
+        versions.append({
+            "version": label,
+            "status": "draft",
+            "created_at": "",
+            "description": "",
+            "change_log": [],
+            "triple_count": snap.get("triple_count", 0),
+            "is_snapshot": True,
+        })
+
+    return versions
+
+
+async def create_version(
+    ontology_id: str,
+    version: str,
+    description: str = None,
+    change_log: list[dict] = None,
+) -> dict:
+    """
+    创建本体版本快照
+
+    1. 在 meta 图中写入版本元数据
+    2. 对当前 abox 做 SPARQL COPY 到 abox@{version}
+
+    Args:
+        ontology_id: 本体 ID
+        version: 版本标签（如 "v1.0", "v2.1-draft"）
+        description: 版本描述
+        change_log: 变更日志列表
+
+    Returns:
+        dict: 版本对象
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
+
+    jena = get_jena_client(dataset)
+    meta_graph = f"{base_iri}/meta"
+    from datetime import datetime
+    now = datetime.utcnow().isoformat() + "Z"
+
+    # 构造版本元数据 Triple
+    version_uri = f"{base_iri}/version/{version.replace('.', '_').replace('-', '_')}"
+    change_log_json = json.dumps(change_log or []) if change_log else "[]"
+
+    triples = [
+        f"<{version_uri}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://onto-agent.com/ontology/vocab#Version> .",
+        f"<{version_uri}> <http://onto-agent.com/ontology/vocab#versionLabel> \"{version}\" .",
+        f"<{version_uri}> <http://onto-agent.com/ontology/vocab#status> \"draft\" .",
+        f"<{version_uri}> <http://purl.org/dc/terms/created> \"{now}\" .",
+    ]
+    if description:
+        desc_escaped = description.replace('"', '\\"')
+        triples.append(f'<{version_uri}> <http://onto-agent.com/ontology/vocab#description> "{desc_escaped}" .')
+    if change_log:
+        cl_escaped = change_log_json.replace('"', '\\"')
+        triples.append(f'<{version_uri}> <http://onto-agent.com/ontology/vocab#changeLog> "{cl_escaped}" .')
+
+    # 写入 meta 图
+    rdf_data = "\n".join(triples)
+    jena.graph_post(meta_graph, rdf_data, "text/turtle")
+
+    # 创建 abox 快照
+    jena.create_version_snapshot(base_iri, version)
+
+    return {
+        "version": version,
+        "status": "draft",
+        "created_at": now,
+        "description": description or "",
+        "change_log": change_log or [],
+    }
+
+
+async def get_version(ontology_id: str, version: str) -> dict:
+    """
+    获取指定版本的详情（内容）
+
+    Returns:
+        dict: 包含 tbox_content 和 abox_content
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        raise ValueError(f"Ontology {ontology_id} not found")
+
+    jena = get_jena_client(dataset)
+
+    # 获取快照内容
+    tbox_content = jena.get_tbox_content(base_iri)
+    abox_content = jena.get_version_snapshot_content(base_iri, version)
+
+    return {
+        "version": version,
+        "tbox_content": tbox_content,
+        "abox_content": abox_content,
+    }
+
+
+async def rollback_version(ontology_id: str, target_version: str) -> bool:
+    """
+    回滚到指定版本
+
+    回滚前自动创建当前状态快照（以 current 为名）
+    然后用 SPARQL COPY 将目标版本恢复到 abox
+
+    Returns:
+        bool: 是否成功
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
+
+    jena = get_jena_client(dataset)
+
+    # 回滚前先创建当前状态快照
+    import time
+    current_label = f"pre_rollback_{int(time.time())}"
+    jena.create_version_snapshot(base_iri, current_label)
+    logger.info(f"Pre-rollback snapshot created: {current_label}")
+
+    return jena.rollback_to_version(base_iri, target_version)
+
+
+async def compare_versions(
+    ontology_id: str,
+    from_ver: str,
+    to_ver: str,
+) -> dict:
+    """
+    对比两个版本的 ABox 内容差异
+
+    Returns:
+        dict: 包含 from_version, to_version, from_content, to_content, diff
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return {}
+
+    jena = get_jena_client(dataset)
+    result = jena.compare_versions(base_iri, from_ver, to_ver)
+    result["from_version"] = from_ver
+    result["to_version"] = to_ver
+    return result
+
+
+async def publish_ontology(ontology_id: str) -> bool:
+    """
+    发布本体：将 tbox 标记为已发布状态（原子替换）
+
+    1. 用 graph_put 将当前 tbox 内容重新写入（发布锁定）
+    2. 更新 meta 图中 owl:Ontology 的状态
+    3. 更新 PostgreSQL ontologies 表的 status
+
+    Returns:
+        bool: 是否成功
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
+
+    from datetime import datetime
+    jena = get_jena_client(dataset)
+    meta_graph = f"{base_iri}/meta"
+
+    # 发布 tbox（原子替换）
+    ok = jena.publish_tbox(base_iri)
+    if not ok:
+        return False
+
+    # 更新 meta 图中的本体状态
+    now = datetime.utcnow().isoformat() + "Z"
+    status_triples = [
+        f'<{base_iri}> <http://onto-agent.com/ontology/vocab#status> "published" .',
+        f'<{base_iri}> <http://onto-agent.com/ontology/vocab#publishedAt> "{now}" .',
+    ]
+    jena.graph_post(meta_graph, "\n".join(status_triples), "text/turtle")
+
+    # 更新 PostgreSQL
+    async with SystemSession() as session:
+        await session.execute(
+            update(Ontology)
+            .where(Ontology.id == ontology_id)
+            .values(status="published", published_at=datetime.utcnow())
+        )
+        await session.commit()
+
+    return True
+
+
+async def unpublish_ontology(ontology_id: str) -> bool:
+    """
+    取消发布：将本体状态改为 draft
+
+    Returns:
+        bool: 是否成功
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
+
+    from datetime import datetime
+    jena = get_jena_client(dataset)
+    meta_graph = f"{base_iri}/meta"
+
+    # 更新 meta 图
+    status_triples = [
+        f'<{base_iri}> <http://onto-agent.com/ontology/vocab#status> "draft" .',
+    ]
+    jena.graph_post(meta_graph, "\n".join(status_triples), "text/turtle")
+
+    # 更新 PostgreSQL
+    async with SystemSession() as session:
+        await session.execute(
+            update(Ontology)
+            .where(Ontology.id == ontology_id)
+            .values(status="draft")
+        )
+        await session.commit()
+
+    return True
+
+
+async def delete_version(ontology_id: str, version: str) -> bool:
+    """
+    删除指定版本快照
+
+    从 meta 图删除版本元数据，删除 abox@{version} 图
+
+    Returns:
+        bool: 是否成功
+    """
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
+
+    jena = get_jena_client(dataset)
+    meta_graph = f"{base_iri}/meta"
+    version_uri = f"{base_iri}/version/{version.replace('.', '_').replace('-', '_')}"
+
+    # 删除 meta 图中的版本元数据
+    delete_sparql = f"""
+    PREFIX onto: <http://onto-agent.com/ontology/vocab#>
+    DELETE {{
+        GRAPH <{meta_graph}> {{
+            <{version_uri}> ?p ?o .
+        }}
+    }}
+    WHERE {{
+        GRAPH <{meta_graph}> {{
+            <{version_uri}> ?p ?o .
+        }}
+    }}
+    """
+    try:
+        jena._update(delete_sparql)
+    except Exception as e:
+        logger.warning(f"delete_version meta cleanup failed: {e}")
+
+    # 删除快照图
+    return jena.delete_version_snapshot(base_iri, version)
+
+
+def _parse_json(value: str) -> list:
+    """安全解析 JSON 字符串"""
+    if not value:
+        return []
+    try:
+        import json
+        return json.loads(value)
+    except Exception:
+        return []

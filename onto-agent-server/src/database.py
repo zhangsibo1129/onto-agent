@@ -2,16 +2,14 @@
 数据库连接配置（双数据库架构）
 
 - system_db: 系统内部数据（本体、实体、版本、Saga）
-- business_db: 业务数据（数据源、映射、同步任务等）
-- ontoagent: 兼容旧配置（保留用于业务查询）
+- onto_agent: 本体业务数据（datasources, mappings, sync_tasks 等）
 
 导出:
 - Base: SQLAlchemy 声明式基类
 - SystemSession: 系统数据库会话
-- BusinessSession: 业务数据库会话  
-- LegacySession: 兼容旧数据的会话
+- BusinessSession: 本体业务数据库会话
 - init_db: 数据库初始化函数
-- get_db: FastAPI 依赖项（业务数据库）
+- get_db: FastAPI 依赖项（本体业务数据库）
 - get_system_db: FastAPI 依赖项（系统数据库）
 """
 
@@ -43,27 +41,18 @@ system_engine = create_async_engine(SYSTEM_DB_URL, echo=False)
 SystemSession = create_session_maker(SYSTEM_DB_URL)
 
 
-# ==================== 业务数据库 ====================
-# 业务数据：datasources, mappings, sync_tasks 等
+# ==================== 本体业务数据库 ====================
+# 本体业务数据：datasources, mappings, sync_tasks 等
 BUSINESS_DB_URL = os.getenv("BUSINESS_DB_URL", "postgresql+asyncpg://postgres:postgres@localhost:5433/onto_agent")
 business_engine = create_async_engine(BUSINESS_DB_URL, echo=False)
 BusinessSession = create_session_maker(BUSINESS_DB_URL)
-
-
-# ==================== 兼容旧配置 ====================
-LEGACY_DB_URL = os.getenv("LEGACY_DB_URL", "postgresql+asyncpg://postgres:postgres@localhost:5433/onto_agent")
-legacy_engine = create_async_engine(LEGACY_DB_URL, echo=False)
-LegacySession = create_session_maker(LEGACY_DB_URL)
-
-# 为了兼容性，也导出默认会话
-async_session_maker = LegacySession
 
 
 # ==================== FastAPI 依赖项 ====================
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    FastAPI 依赖项：获取业务数据库会话
+    FastAPI 依赖项：获取本体业务数据库会话
     
     用于: datasource, mapping, sync_task 等业务路由
     """

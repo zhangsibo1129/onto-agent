@@ -131,6 +131,40 @@ class JenaBaseClient:
         except Exception as e:
             logger.error(f"SPARQL update failed: {e}")
             return False
+
+    def query_ask(self, sparql: str) -> bool:
+        """执行 ASK 查询，返回 True/False"""
+        try:
+            sw = SPARQLWrapper2(self.query_endpoint)
+            sw.setQuery(sparql)
+            sw.setReturnFormat(JSON)
+            sw.setMethod(GET)
+            result = sw.query()
+            # ASK 返回的是 boolean
+            if isinstance(result, bool):
+                return result
+            # SPARQLWrapper 2.x 可能返回 dict
+            if isinstance(result, dict):
+                return result.get('boolean', False)
+            return False
+        except Exception as e:
+            logger.error(f"SPARQL ASK failed: {e}")
+            raise JenaQueryError(f"SPARQL ASK failed: {e}")
+
+    def query_construct(self, sparql: str) -> str:
+        """执行 CONSTRUCT/DESCRIBE 查询，返回 Turtle 字符串"""
+        try:
+            from SPARQLWrapper import TURTLE
+            sw = SPARQLWrapper2(self.query_endpoint)
+            sw.setQuery(sparql)
+            sw.setReturnFormat(TURTLE)
+            sw.setMethod(GET)
+            result = sw.query()
+            # CONSTRUCT 返回的是 Turtle 字符串
+            return str(result) if result else ""
+        except Exception as e:
+            logger.error(f"SPARQL CONSTRUCT failed: {e}")
+            raise JenaQueryError(f"SPARQL CONSTRUCT failed: {e}")
     
     # ==================== 数据集管理 ====================
     

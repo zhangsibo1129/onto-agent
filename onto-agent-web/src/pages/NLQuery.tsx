@@ -1,139 +1,251 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { nlToSparql, executeSparql } from "@/services/queryApi"
+import { ontologyApi, type Ontology } from "@/services/ontologyApi"
 import "./NLQuery.css"
 
-const ontologies = ["客户360", "供应商网络", "订单全景"]
-
-const suggestions = [
-  "显示所有金牌客户",
-  "订单总额超过100万的客户",
-  "过去30天新增的客户",
-  "按销售额排序的前10名客户",
+const SUGGESTIONS = [
+  "显示所有客户",
+  "有多少个订单",
+  "列出所有产品",
+  "显示所有供应商",
 ]
 
-const messages = [
-  {
-    type: "user",
-    content: "显示上月高价值客户",
-  },
-  {
-    type: "assistant",
-    title: "已为您生成查询",
-    query: `PREFIX onto: <http://ontoagent.com/ontology#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-SELECT ?customerName ?email ?lifetimeValue
-WHERE {
-  ?customer rdf:type onto:Customer ;
-           onto:name ?customerName ;
-           onto:email ?email ;
-           onto:lifetimeValue ?lifetimeValue ;
-           onto:tier ?tier .
-  
-  FILTER(?tier IN ("Gold", "Platinum"))
-  FILTER(?lifetimeValue > 1000000)
+interface ChatMessage {
+  id: string
+  type: "user" | "assistant"
+  content: string
+  nlText?: string
+  sparql?: string
+  results?: unknown[]
+  resultCount?: number
+  error?: string
 }
-ORDER BY DESC(?lifetimeValue)
-LIMIT 20`,
-    results: [
-      { name: "Apple Inc.", email: "procurement@apple.com", value: "$2,456,789" },
-      { name: "Microsoft Corp.", email: "orders@microsoft.com", value: "$1,892,345" },
-      { name: "Amazon.com", email: "vendor@amazon.com", value: "$1,654,230" },
-    ],
-  },
-]
 
 export default function NLQuery() {
+  const [ontologies, setOntologies] = useState<Ontology[]>([])
+  const [selectedOntologyId, setSelectedOntologyId] = useState<string>("")
   const [input, setInput] = useState("")
-  const [selectedOntology, setSelectedOntology] = useState("客户360")
-  const [chatMessages, setChatMessages] = useState(messages)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const handleSend = () => {
-    if (!input.trim()) return
-    setChatMessages([...chatMessages, { type: "user", content: input }])
+  // Load ontologies
+  useEffect(() => {
+    ontologyApi.list().then(setOntologies).catch(console.error)
+  }, [])
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  const selectedOntology = ontologies.find((o) => o.id === selectedOntologyId)
+
+  const handleSend = async () => {
+    if (!input.trim() || !selectedOntologyId) return
+    const nlText = input.trim()
     setInput("")
+
+    // Add user message
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      type: "user",
+      content: nlText,
+    }
+    setMessages((prev) => [...prev, userMsg])
+
+    setIsLoading(true)
+
+    try {
+      // NL → SPARQL
+      const nlResult = await nlToSparql(selectedOntologyId, nlText)
+
+      if (!nlResult.success) {
+        const errMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          type: "assistant",
+          content: "抱歉，无法理解您的问题。",
+          nlText,
+        }
+        setMessages((prev) => [...prev, errMsg])
+        setIsLoading(false)
+        return
+      }
+
+      // Execute the generated SPARQL
+      const execResult = await executeSparql(selectedOntologyId, nlResult.sparql)
+
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: "assistant",
+        content: execResult.success
+          ? `已生成并执行查询，返回 ${execResult.resultCount} 条结果`
+          : `已生成查询，但执行失败：${execResult.error}`,
+        nlText,
+        sparql: nlResult.sparql,
+        results: Array.isArray(execResult.results) ? execResult.results as unknown[] : undefined,
+        resultCount: execResult.resultCount,
+        error: execResult.error,
+      }
+      setMessages((prev) => [...prev, assistantMsg])
+    } catch (e: any) {
+      const errMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: "assistant",
+        content: "发生错误：" + (e.message || "未知错误"),
+        nlText,
+      }
+      setMessages((prev) => [...prev, errMsg])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Copy SPARQL to clipboard
+  const handleCopySparql = (sparql: string) => {
+    navigator.clipboard.writeText(sparql).then(() => {
+      alert("SPARQL 已复制到剪贴板")
+    })
   }
 
   return (
-      <div className="chat-area">
-        <div className="chat-header">
-          <div className="chat-ontology-select">
-            <select
-              className="form-select"
-              value={selectedOntology}
-              onChange={(e) => setSelectedOntology(e.target.value)}
-            >
-              {ontologies.map((ontology) => (
-                <option key={ontology} value={ontology}>{ontology}</option>
-              ))}
-            </select>
+    <div className="chat-layout">
+      {/* Top bar */}
+      <div className="flex gap-3" style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--border-primary)" }}>
+        <select
+          className="select"
+          value={selectedOntologyId}
+          onChange={(e) => setSelectedOntologyId(e.target.value)}
+          style={{ minWidth: 200 }}
+        >
+          <option value="">— 选择本体 —</option>
+          {ontologies.map((o) => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
+        {selectedOntology && (
+          <span className="text-sm text-secondary">
+            {selectedOntology.baseIri}
+          </span>
+        )}
+      </div>
+
+      {/* Chat messages */}
+      <div className="chat-messages">
+        {messages.length === 0 && (
+          <div className="chat-empty">
+            <div className="chat-empty-icon">💬</div>
+            <div className="chat-empty-title">自然语言查询</div>
+            <div className="chat-empty-desc">
+              选择本体后，用自然语言描述您的查询问题
+            </div>
           </div>
-        </div>
-        <div className="chat-messages">
-          {chatMessages.map((msg, index) => (
-            <div key={index} className={`chat-msg ${msg.type}`}>
-              <div className="chat-avatar">{msg.type === "user" ? "U" : "AI"}</div>
-              <div className="chat-bubble">
-                {msg.type === "assistant" && <div className="cb-title">{msg.title}</div>}
-                <div>{msg.content}</div>
-                {msg.query && <div className="cb-query">{msg.query}</div>}
-                {msg.results && (
-                  <div className="cb-results">
-                    <table className="cb-result-table">
-                      <thead>
-                        <tr>
-                          <th>客户名称</th>
-                          <th>邮箱</th>
-                          <th>客户价值</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {msg.results.map((r: any, i: number) => (
-                          <tr key={i}>
-                            <td>{r.name}</td>
-                            <td>{r.email}</td>
-                            <td style={{ color: "var(--status-success)" }}>{r.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+        )}
+
+        {messages.map((msg) => (
+          <div key={msg.id} className={`chat-msg ${msg.type}`}>
+            <div className="chat-avatar">
+              {msg.type === "user" ? "U" : "AI"}
+            </div>
+            <div className="chat-bubble">
+              {msg.type === "assistant" && (
+                <div className="cb-title">已为您生成查询</div>
+              )}
+              <div className="cb-content">{msg.content}</div>
+
+              {msg.sparql && (
+                <div className="cb-query">
+                  <div className="cb-query-label">SPARQL</div>
+                  <pre className="cb-query-text">{msg.sparql}</pre>
+                  <div className="cb-query-actions">
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleCopySparql(msg.sparql!)}
+                    >
+                      📋 复制
+                    </button>
                   </div>
-                )}
-                {msg.type === "assistant" && (
-                  <div className="chat-actions">
-                    <button className="btn btn-ghost btn-sm">复制查询</button>
-                    <button className="btn btn-ghost btn-sm">查看详情</button>
-                  </div>
-                )}
+                </div>
+              )}
+
+              {msg.error && (
+                <div className="alert alert-error" style={{ marginTop: 8 }}>
+                  {msg.error}
+                </div>
+              )}
+
+              {msg.results && !msg.error && msg.resultCount !== undefined && msg.resultCount > 0 && (
+                <div className="cb-results">
+                  {Array.isArray(msg.results) && (msg.results as unknown[]).length > 0 && (
+                    <div className="result-note">
+                      前 {Math.min(10, (msg.results as unknown[]).length)} 条结果
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="chat-msg assistant">
+            <div className="chat-avatar">AI</div>
+            <div className="chat-bubble">
+              <div className="cb-loading">
+                <span className="loading-dot">●</span>
+                <span className="loading-dot">●</span>
+                <span className="loading-dot">●</span>
+                正在理解您的问题...
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
 
-        <div className="chat-input-area">
-          <div className="chat-input-wrapper">
-            <textarea
-              className="chat-input"
-              placeholder="输入您的查询问题..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              rows={1}
-            />
-            <button className="btn btn-primary" onClick={handleSend}>发送</button>
-          </div>
-          <div className="suggestions">
-            {suggestions.map((s) => (
-              <div key={s} className="suggestion-chip" onClick={() => setInput(s)}>
-                {s}
-              </div>
-            ))}
-          </div>
-        </div>
+        <div ref={messagesEndRef} />
       </div>
+
+      {/* Input area */}
+      <div className="chat-input-area">
+        {selectedOntologyId ? (
+          <>
+            <div className="chat-input-wrapper">
+              <textarea
+                className="chat-input"
+                placeholder="用自然语言描述您的查询，例如：显示所有金牌客户..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend()
+                  }
+                }}
+                rows={1}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleSend}
+                disabled={isLoading || !input.trim()}
+              >
+                发送
+              </button>
+            </div>
+            <div className="suggestions">
+              {SUGGESTIONS.map((s) => (
+                <div
+                  key={s}
+                  className="suggestion-chip"
+                  onClick={() => setInput(s)}
+                >
+                  {s}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="chat-select-hint">请先在上方选择一个本体</div>
+        )}
+      </div>
+    </div>
   )
 }

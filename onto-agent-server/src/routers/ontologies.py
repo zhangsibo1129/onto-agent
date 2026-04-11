@@ -12,6 +12,7 @@ from src.schemas.ontology import (
     OntologyResponse,
     OntologyDetailResponse,
     OntologyCreate,
+    OntologyUpdate,
 )
 
 router = APIRouter(prefix="/api/ontologies", tags=["ontologies"])
@@ -45,6 +46,22 @@ async def create_ontology(data: OntologyCreate):
 async def get_ontology(ontology_id: str):
     """获取本体"""
     ontology = await ontology_service.get_ontology(ontology_id)
+    if not ontology:
+        return {"success": False, "error": "Ontology not found"}
+    return success_response(ontology)
+
+
+@router.put("/{ontology_id}")
+async def update_ontology(ontology_id: str, data: OntologyUpdate):
+    """更新本体"""
+    ontology = await ontology_service.update_ontology(
+        ontology_id=ontology_id,
+        name=data.name,
+        description=data.description,
+        version=data.version,
+        status=data.status,
+        base_iri=data.base_iri,
+    )
     if not ontology:
         return {"success": False, "error": "Ontology not found"}
     return success_response(ontology)

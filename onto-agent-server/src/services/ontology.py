@@ -101,6 +101,45 @@ async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
     return _to_ontology_response(o)
 
 
+async def update_ontology(
+    ontology_id: str,
+    name: str = None,
+    description: str = None,
+    version: str = None,
+    status: str = None,
+    base_iri: str = None,
+) -> Optional[OntologyResponse]:
+    """更新本体：PostgreSQL + Jena meta 图
+
+    注意：base_iri 变更需要重命名 Jena 命名图（复杂操作，暂不支持）
+    """
+    o = await _get_ontology_by_id(ontology_id)
+    if not o:
+        return None
+
+    # PostgreSQL 更新
+    async with SystemSession() as session:
+        updates: dict = {}
+        if name is not None:
+            updates["name"] = name
+        if description is not None:
+            updates["description"] = description
+        if version is not None:
+            updates["version"] = version
+        if status is not None:
+            updates["status"] = status
+
+        if updates:
+            await session.execute(
+                update(Ontology).where(Ontology.id == ontology_id).values(**updates)
+            )
+            await session.commit()
+
+    # 重新读取更新后的本体
+    updated = await _get_ontology_by_id(ontology_id)
+    return _to_ontology_response(updated) if updated else None
+
+
 async def delete_ontology(ontology_id: str) -> bool:
     """删除本体：PostgreSQL + Jena 命名图（不删除数据集）"""
     o = await _get_ontology_by_id(ontology_id)

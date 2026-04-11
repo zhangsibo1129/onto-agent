@@ -7,6 +7,7 @@ from src.database import init_db
 from src.routers import datasource
 from src.routers import ontologies, properties, individuals, debug
 from src.routers import sync, mappings, query
+from src.routers import admin
 from humps import camelize
 
 
@@ -55,6 +56,7 @@ app.include_router(debug.router)
 app.include_router(sync.router)
 app.include_router(mappings.router)
 app.include_router(query.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")

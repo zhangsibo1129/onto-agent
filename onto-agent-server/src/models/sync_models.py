@@ -3,7 +3,7 @@ Phase 5+6: Sync and Mapping models
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, DateTime, ForeignKey, Integer, func, UniqueConstraint
+from sqlalchemy import String, Text, DateTime, ForeignKey, Integer, func, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from src.database import Base
 

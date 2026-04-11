@@ -11,7 +11,7 @@ environ.setdefault("NO_PROXY", "localhost,127.0.0.1")
 environ.setdefault("no_proxy", "localhost,127.0.0.1")
 
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -83,20 +83,37 @@ class JenaBaseClient:
     # ==================== 基础 SPARQL 操作 ====================
     
     def _query(self, sparql: str) -> list[dict]:
-        """执行 SELECT/ASK 查询"""
+        """
+        执行 SELECT/ASK 查询
+
+        返回的 dict 中，每个单元格的值已展开为 Python 原生类型：
+          URI/BlankNode → str
+          Literal       → str / int / float / bool
+          None          → 键不存在时返回 None
+        """
         try:
             sw = SPARQLWrapper2(self.query_endpoint)
             sw.setQuery(sparql)
             sw.setReturnFormat(JSON)
             sw.setMethod(GET)
-            
+
             results = sw.query()
-            
+
             if not results or not results.bindings:
                 return []
-            
+
+            def _expand(cell) -> Any:
+                """将 SPARQLWrapper.Value 或 dict 展开为 Python 原生值"""
+                if cell is None:
+                    return None
+                if hasattr(cell, "value"):  # SPARQLWrapper.Value
+                    return cell.value
+                if isinstance(cell, dict):  # 已经是 dict（如 SPARQLWrapper.SmartWrapper 可能返回的结构）
+                    return cell.get("value")
+                return cell
+
             return [
-                {key: row[key] for key in row.keys()}
+                {key: _expand(row[key]) for key in row.keys()}
                 for row in results.bindings
             ]
         except Exception as e:

@@ -136,7 +136,7 @@ class OntologyClassUpdate(CamelCaseModel):
 
 class OntologyClassResponse(OntologyClassBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     equivalent_to: list[str] = Field(default_factory=list)
     disjoint_with: list[str] = Field(default_factory=list)
     super_classes: list[str] = Field(default_factory=list)
@@ -176,7 +176,7 @@ class DataPropertyUpdate(CamelCaseModel):
 
 class DataPropertyResponse(DataPropertyBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     domain_ids: list[str] = Field(default_factory=list)
     range_type: DataType
     characteristics: list[PropertyCharacteristic] = Field(default_factory=list)
@@ -221,7 +221,7 @@ class ObjectPropertyUpdate(CamelCaseModel):
 
 class ObjectPropertyResponse(ObjectPropertyBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     domain_ids: list[str] = Field(default_factory=list)
     range_ids: list[str] = Field(default_factory=list)
     characteristics: list[PropertyCharacteristic] = Field(default_factory=list)
@@ -249,7 +249,7 @@ class AnnotationPropertyCreate(AnnotationPropertyBase):
 
 class AnnotationPropertyResponse(AnnotationPropertyBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     domain_ids: list[str] = Field(default_factory=list)
     range_ids: list[str] = Field(default_factory=list)
     sub_property_of_id: Optional[str] = None
@@ -297,7 +297,7 @@ class IndividualUpdate(CamelCaseModel):
 
 class IndividualResponse(IndividualBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     data_property_assertions: list[DataPropertyAssertion] = Field(default_factory=list)
     object_property_assertions: list[ObjectPropertyAssertion] = Field(
         default_factory=list
@@ -336,7 +336,7 @@ class AxiomCreate(AxiomBase):
 
 class AxiomResponse(AxiomBase):
     id: str
-    ontology_id: str
+    ontology_id: Optional[str] = None
     subject: Optional[str] = None
     assertions: dict[str, Any] = Field(default_factory=dict)
 

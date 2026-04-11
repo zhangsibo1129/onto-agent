@@ -103,44 +103,25 @@ async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
 
 async def delete_ontology(ontology_id: str) -> bool:
     """删除本体：PostgreSQL + Jena 命名图（不删除数据集）"""
-    # 获取本体信息（删除前保存命名图 URI）
     o = await _get_ontology_by_id(ontology_id)
     if not o:
         return False
-    
-    # 保存命名图 URI（删除本体后无法从 DB 获取）
-    tbox_graph_uri = o.tbox_graph_uri
-    abox_graph_uri = o.abox_graph_uri
-    
+
+    base_iri = o.base_iri
+
     # 删除本体
     await _delete_ontology_by_id(ontology_id)
-
     get_metadata_store().delete(ontology_id)
 
-    # 异步删除 Jena 命名图（不删除整个数据集）
+    # 同步删除 Jena 所有本体命名图（meta + tbox + abox + 所有 abox@vN）
     try:
-        import asyncio
         jena = _get_jena()
         if jena:
-            asyncio.create_task(_jena_delete_named_graphs(tbox_graph_uri, abox_graph_uri))
-    except Exception:
-        pass
+            jena.graph_delete_all_ontology_graphs(base_iri)
+    except Exception as e:
+        logger.error(f"delete ontology graphs failed: base_iri={base_iri}, error={e}")
 
     return True
-
-
-async def _jena_delete_named_graphs(tbox_graph_uri: str, abox_graph_uri: str = None):
-    """删除 Jena 中的命名图（不删除数据集）"""
-    try:
-        jena = _get_jena()
-        if jena:
-            # 删除 TBox 命名图
-            jena.delete_named_graph(tbox_graph_uri)
-            # 删除 ABox 命名图（如果存在）
-            if abox_graph_uri:
-                jena.delete_named_graph(abox_graph_uri)
-    except Exception as e:
-        logger.error(f"delete named graphs failed: tbox={tbox_graph_uri}, abox={abox_graph_uri}, error={e}")
 
 
 # ============================================================================
@@ -248,7 +229,7 @@ async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
         return []
     try:
         jena = get_jena_client(dataset)
-        return jena.list_classes(base_iri, tbox_graph_uri=tbox_graph_uri)
+        return jena.list_classes(base_iri)
     except Exception:
         return []
 
@@ -298,7 +279,7 @@ async def get_individuals(
         return []
     try:
         jena = get_jena_client(dataset)
-        return jena.list_individuals(base_iri, class_id=class_id, search=search)
+        return jena.list_individuals(base_iri, class_local_name=class_id, search=search)
     except Exception as e:
         logger.warning(f"get_individuals failed: {e}")
         return []
@@ -332,22 +313,21 @@ async def create_ontology(
     new_id = str(uuid.uuid4())[:8]
     if not base_iri:
         base_iri = f"http://onto-agent.com/ontology/{name}#"
-    # 使用统一 Dataset + Named Graph 架构
-    dataset = f"/onto-agent"
-    tbox_graph_uri = f"{dataset}/{new_id}/tbox"
-    abox_graph_uri = f"{dataset}/{new_id}/abox"
+    # 新命名图架构：统一 Dataset，所有本体共享 /onto-agent
+    dataset = "/onto-agent"
+    # 注意：tbox_graph_uri / abox_graph_uri 不再从 baseIri 计算，保持向后兼容字段
+    tbox_graph_uri = f"{base_iri}/tbox"
+    abox_graph_uri = f"{base_iri}/abox"
     now = datetime.utcnow().isoformat() + "Z"
 
-    # 1. Jena：创建 dataset + 本体头（写入 TBox 命名图）
+    # 1. Jena：初始化本体三个命名图（meta + tbox + abox）
     try:
         jena = get_jena_client()
         jena.create_dataset(dataset)
-        ds_jena = get_jena_client(dataset)
-        ds_jena.create_ontology(
-            name=name, 
-            base_iri=base_iri, 
+        jena.create_ontology(
+            name=name,
+            base_iri=base_iri,
             description=description,
-            tbox_graph_uri=tbox_graph_uri,  # 写入 TBox 命名图
         )
     except Exception as e:
         logger.error(f"create ontology failed: {e}")
@@ -360,6 +340,8 @@ async def create_ontology(
             description=description,
             base_iri=base_iri,
             dataset=dataset,
+            # 新架构下 tbox/abox URI 由 base_iri 推导，不再存储计算后的 URI
+            # 但保留字段以兼容旧代码
             tbox_graph_uri=tbox_graph_uri,
             abox_graph_uri=abox_graph_uri,
             version="v1.0",
@@ -424,32 +406,45 @@ async def create_ontology_class(
     super_classes: list = None,
 ) -> OntologyClassResponse:
     """创建类：Jena → PostgreSQL 索引"""
-    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     class_uri = f"{base_iri}{name}"
     super_iris = [f"{base_iri}{sc}" for sc in (super_classes or [])]
 
-    # 1. Jena 写入 TBox 命名图
-    jena_result = None
+    # 1. Jena 写入 TBox 图
+    jena_ok = False
     try:
         jena = get_jena_client(dataset)
-        jena_result = jena.create_class(
-            class_uri=class_uri,
+        jena_ok = jena.create_class(
+            base_iri,
+            name,  # class_local_name
             display_name=display_name,
             description=description,
-            super_class_uris=super_iris if super_iris else None,
-            tbox_graph_uri=tbox_graph_uri,
+            super_class_iris=super_iris if super_iris else None,
         )
     except Exception as e:
         logger.error(f"create class failed: {e}")
 
     # 2. PostgreSQL 索引
+    tbox_graph_uri = f"{base_iri}/tbox"
     await _index_entity(ontology_id, "CLASS", name, display_name, class_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "class_count")
 
-    return jena_result or OntologyClassResponse(
+    if jena_ok:
+        # 从 Jena 重新读取完整数据
+        try:
+            jena = get_jena_client(dataset)
+            classes = jena.list_classes(base_iri)
+            for c in classes:
+                if c.id == name:
+                    return c
+        except Exception:
+            pass
+
+    # Jena 不可用时构造响应
+    return OntologyClassResponse(
         id=name,
         ontology_id=ontology_id,
         name=name,
@@ -510,9 +505,13 @@ async def update_ontology_class(
     # 重新从 Jena 读取最新数据
     try:
         jena = get_jena_client(dataset)
-        return jena.get_class(class_uri)
+        classes = jena.list_classes(base_iri)
+        for c in classes:
+            if c.id == (name or class_id):
+                return c
     except Exception:
-        return None
+        pass
+    return None
 
 
 async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
@@ -548,32 +547,42 @@ async def create_data_property(
     super_property_id: str = None,
 ) -> DataPropertyResponse:
     """创建 DataProperty：Jena → PostgreSQL 索引"""
-    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
-    domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
-    prop_uri = f"{base_iri}{name}"
+    domain_local_name = domain_ids[0] if domain_ids else None
 
-    jena_result = None
+    jena_ok = False
     try:
         jena = get_jena_client(dataset)
-        jena_result = jena.create_datatype_property(
-            prop_uri=prop_uri,
-            domain_uri=domain_iri,
+        jena_ok = jena.create_datatype_property(
+            base_iri,
+            name,  # prop_local_name
+            domain_local_name,  # domain_local_name
             range_type=range_type,
             display_name=display_name,
             characteristics=characteristics,
-            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"create dataprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
+    tbox_graph_uri = f"{base_iri}/tbox"
     await _index_entity(ontology_id, "DP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "dp_count")
 
-    return jena_result or DataPropertyResponse(
+    if jena_ok:
+        try:
+            jena = get_jena_client(dataset)
+            props = jena.list_datatype_properties(base_iri)
+            for p in props:
+                if p.id == name:
+                    return p
+        except Exception:
+            pass
+
+    return DataPropertyResponse(
         id=name,
         ontology_id=ontology_id,
         name=name,
@@ -605,19 +614,19 @@ async def update_data_property(
         return None
 
     prop_uri = f"{base_iri}{prop_id}"
-    domain_uri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
+    domain_local_name = domain_ids[0] if domain_ids else None
 
     try:
         jena = get_jena_client(dataset)
         # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
         jena.delete_datatype_property(prop_uri)
         jena.create_datatype_property(
-            prop_uri=prop_uri,
-            domain_uri=domain_uri,
+            base_iri,
+            prop_id,  # prop_local_name
+            domain_local_name,
             range_type=range_type or "string",
             display_name=display_name,
             characteristics=characteristics,
-            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"update dataprop failed: {e}")
@@ -677,35 +686,44 @@ async def create_object_property(
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
     """创建 ObjectProperty：Jena → PostgreSQL 索引"""
-    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
-    domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
-    range_iri = f"{base_iri}{range_ids[0]}" if range_ids else base_iri
-    inverse_of = f"{base_iri}{inverse_of_id}" if inverse_of_id else None
-    prop_uri = f"{base_iri}{name}"
+    domain_local_name = domain_ids[0] if domain_ids else None
+    range_local_name = range_ids[0] if range_ids else None
 
-    jena_result = None
+    jena_ok = False
     try:
         jena = get_jena_client(dataset)
-        jena_result = jena.create_object_property(
-            prop_uri=prop_uri,
-            domain_uri=domain_iri,
-            range_uri=range_iri,
+        jena_ok = jena.create_object_property(
+            base_iri,
+            name,  # prop_local_name
+            domain_local_name,
+            range_local_name,
             display_name=display_name,
             characteristics=characteristics,
-            inverse_of=inverse_of,
-            tbox_graph_uri=tbox_graph_uri,
+            inverse_of_local_name=inverse_of_id,
         )
     except Exception as e:
         logger.error(f"create objprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
+    tbox_graph_uri = f"{base_iri}/tbox"
     await _index_entity(ontology_id, "OP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "op_count")
 
-    return jena_result or ObjectPropertyResponse(
+    if jena_ok:
+        try:
+            jena = get_jena_client(dataset)
+            props = jena.list_object_properties(base_iri)
+            for p in props:
+                if p.id == name:
+                    return p
+        except Exception:
+            pass
+
+    return ObjectPropertyResponse(
         id=name,
         ontology_id=ontology_id,
         name=name,
@@ -741,21 +759,20 @@ async def update_object_property(
         return None
 
     prop_uri = f"{base_iri}{prop_id}"
-    domain_uri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
-    range_uri = f"{base_iri}{range_ids[0]}" if range_ids else base_iri
-    inverse_of = f"{base_iri}{inverse_of_id}" if inverse_of_id else None
+    domain_local_name = domain_ids[0] if domain_ids else None
+    range_local_name = range_ids[0] if range_ids else None
 
     try:
         jena = get_jena_client(dataset)
         jena.delete_object_property(prop_uri)
         jena.create_object_property(
-            prop_uri=prop_uri,
-            domain_uri=domain_uri,
-            range_uri=range_uri,
+            base_iri,
+            prop_id,  # prop_local_name
+            domain_local_name,
+            range_local_name,
             display_name=display_name,
             characteristics=characteristics,
-            inverse_of=inverse_of,
-            tbox_graph_uri=tbox_graph_uri,
+            inverse_of_local_name=inverse_of_id,
         )
     except Exception as e:
         logger.error(f"update objprop failed: {e}")
@@ -816,6 +833,7 @@ async def create_annotation_property(
         raise ValueError(f"Ontology {ontology_id} not found")
 
     prop_uri = f"{base_iri}{name}"
+    tbox_graph_uri = f"{base_iri}/tbox"
     await _index_entity(ontology_id, "AP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "ap_count")
 
@@ -843,29 +861,46 @@ async def create_individual(
     object_property_assertions: list = None,
 ) -> IndividualResponse:
     """创建 Individual：Jena ABox → PostgreSQL 索引"""
-    base_iri, dataset, _, abox_graph_uri = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
-    ind_uri = f"{base_iri}{name}"
-    class_uris = [f"{base_iri}{t}" for t in (types or [])]
+    # 转换类型列表为局部名称
+    class_local_names = types or []
 
-    # 1. Jena 写入 ABox 命名图
-    jena_result = None
+    # 转换属性断言中的 URI 为局部名称
+    dp_assertions = None
+    if data_property_assertions:
+        dp_assertions = [
+            {"propertyLocalName": p.get("propertyUri", "").split("#")[-1].split("/")[-1],
+             "value": p.get("value", "")}
+            for p in data_property_assertions
+        ]
+    op_assertions = None
+    if object_property_assertions:
+        op_assertions = [
+            {"propertyLocalName": p.get("propertyUri", "").split("#")[-1].split("/")[-1],
+             "targetLocalName": p.get("targetUri", "").split("#")[-1].split("/")[-1]}
+            for p in object_property_assertions
+        ]
+
+    # 1. Jena 写入 ABox 图
     try:
         jena = get_jena_client(dataset)
-        jena_result = jena.create_individual(
-            individual_uri=ind_uri,
-            class_uris=class_uris,
+        jena.create_individual(
+            base_iri,
+            name,  # individual_local_name
+            class_local_names,
             display_name=display_name,
-            data_property_assertions=data_property_assertions,
-            object_property_assertions=object_property_assertions,
-            abox_graph_uri=abox_graph_uri,
+            data_property_assertions=dp_assertions,
+            object_property_assertions=op_assertions,
         )
     except Exception as e:
         logger.error(f"create individual failed: {e}")
 
     # 2. PostgreSQL 索引
+    ind_uri = f"{base_iri}{name}"
+    abox_graph_uri = f"{base_iri}/abox"
     await _index_entity(ontology_id, "INDIVIDUAL", name, display_name, ind_uri, graph_uri=abox_graph_uri)
     await _increment_count(ontology_id, "individual_count")
 

@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.database import init_db
-from src.routers import datasource, ontology
+from src.routers import datasource
+from src.routers import ontologies, properties, individuals, debug
 from humps import camelize
 
 
@@ -46,7 +47,10 @@ app.add_middleware(
 )
 
 app.include_router(datasource.router, prefix="/api")
-app.include_router(ontology.router, prefix="/api")
+app.include_router(ontologies.router)
+app.include_router(properties.router)
+app.include_router(individuals.router)
+app.include_router(debug.router)
 
 
 @app.get("/api/health")

@@ -32,6 +32,7 @@ from src.services.jena_client import (
     JenaClient,
 )
 from src.services.ontology_metadata import get_metadata_store, OntologyMetadata
+from src.database import SystemSession
 from src.repositories import OntologyRepository, EntityIndexRepository
 from src.repositories.ontology import (
     get_ontology_by_id as _get_ontology_by_id,

@@ -344,6 +344,44 @@ export interface CreateOntologyDto {
 }
 
 // ============================================================
+// Version Types
+// ============================================================
+
+export interface VersionChange {
+  type: "added" | "modified" | "deleted"
+  text: string
+}
+
+export interface Version {
+  version: string
+  status: "draft" | "published" | "archived"
+  createdAt: string
+  description: string
+  changeLog: VersionChange[]
+  tripleCount?: number
+  isSnapshot?: boolean
+}
+
+export interface VersionDetail {
+  version: string
+  tboxContent: string
+  aboxContent: string
+}
+
+export interface VersionCompareResult {
+  fromVersion: string
+  toVersion: string
+  fromContent: string
+  toContent: string
+}
+
+export interface CreateVersionDto {
+  version: string
+  description?: string
+  changeLog?: VersionChange[]
+}
+
+// ============================================================
 // API Methods
 // ============================================================
 
@@ -428,4 +466,52 @@ export const ontologyApi = {
   // Data Ranges
   getDataRanges: (ontologyId: string) =>
     request<DataRange[]>(`/ontologies/${ontologyId}/data-ranges`),
+
+  // ============================================================
+  // Version Management
+  // ============================================================
+  listVersions: (ontologyId: string) =>
+    request<Version[]>(`/ontologies/${ontologyId}/versions`),
+
+  createVersion: (ontologyId: string, dto: CreateVersionDto) =>
+    request<Version>(`/ontologies/${ontologyId}/versions`, {
+      method: "POST",
+      body: JSON.stringify(dto),
+    }),
+
+  getVersion: (ontologyId: string, version: string) =>
+    request<VersionDetail>(
+      `/ontologies/${ontologyId}/versions/${encodeURIComponent(version)}`
+    ),
+
+  rollbackVersion: (ontologyId: string, targetVersion: string) =>
+    request<{ success: boolean }>(`/ontologies/${ontologyId}/rollback`, {
+      method: "POST",
+      body: JSON.stringify({ target_version: targetVersion }),
+    }),
+
+  compareVersions: (
+    ontologyId: string,
+    fromVer: string,
+    toVer: string
+  ) =>
+    request<VersionCompareResult>(
+      `/ontologies/${ontologyId}/versions/compare?from_ver=${encodeURIComponent(fromVer)}&to_ver=${encodeURIComponent(toVer)}`
+    ),
+
+  publishOntology: (ontologyId: string) =>
+    request<{ success: boolean }>(`/ontologies/${ontologyId}/publish`, {
+      method: "POST",
+    }),
+
+  unpublishOntology: (ontologyId: string) =>
+    request<{ success: boolean }>(`/ontologies/${ontologyId}/unpublish`, {
+      method: "POST",
+    }),
+
+  deleteVersion: (ontologyId: string, version: string) =>
+    request<{ success: boolean }>(
+      `/ontologies/${ontologyId}/versions/${encodeURIComponent(version)}`,
+      { method: "DELETE" }
+    ),
 }

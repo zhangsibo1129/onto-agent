@@ -931,6 +931,104 @@ async def create_individual(
     )
 
 
+# =============================================================================
+# Individual CRUD (get/update/delete)
+# =============================================================================
+
+async def get_individual(ontology_id: str, individual_id: str) -> Optional[IndividualResponse]:
+    """获取单个 Individual 详情"""
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return None
+
+    try:
+        jena = get_jena_client(dataset)
+        abox_graph = f"{base_iri}/abox"
+        ind_uri = f"{base_iri}{individual_id}"
+        # 从 abox 图查询该 individual
+        q = f"""
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+        SELECT ?p ?o
+        FROM <{abox_graph}>
+        WHERE {{ <{ind_uri}> ?p ?o }}
+        """
+        rows = jena._query(q)
+        if not rows:
+            return None
+        # 简单构造返回
+        return IndividualResponse(
+            id=individual_id,
+            ontology_id=ontology_id,
+            name=individual_id,
+            display_name=individual_id,
+            description="",
+            types=[],
+            labels={},
+            comments={},
+            data_property_assertions=[],
+            object_property_assertions=[],
+        )
+    except Exception as e:
+        logger.error(f"get individual failed: {e}")
+        return None
+
+
+async def update_individual(
+    ontology_id: str,
+    individual_id: str,
+    display_name: str = None,
+    description: str = None,
+    types: list = None,
+    labels: dict = None,
+    comments: dict = None,
+) -> Optional[IndividualResponse]:
+    """更新 Individual（简化：delete + recreate）"""
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return None
+
+    try:
+        jena = get_jena_client(dataset)
+        ind_uri = f"{base_iri}{individual_id}"
+        abox_graph = f"{base_iri}/abox"
+        # 删除旧的
+        jena.delete_individual(ind_uri, abox_graph=abox_graph)
+    except Exception as e:
+        logger.error(f"update individual delete failed: {e}")
+
+    # 重新创建
+    return await create_individual(
+        ontology_id=ontology_id,
+        name=individual_id,
+        display_name=display_name,
+        description=description,
+        types=types,
+        labels=labels,
+        comments=comments,
+    )
+
+
+async def delete_individual(ontology_id: str, individual_id: str) -> bool:
+    """删除 Individual：Jena + PostgreSQL 索引"""
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
+    if not base_iri:
+        return False
+
+    try:
+        jena = get_jena_client(dataset)
+        ind_uri = f"{base_iri}{individual_id}"
+        abox_graph = f"{base_iri}/abox"
+        jena.delete_individual(ind_uri, abox_graph=abox_graph)
+    except Exception as e:
+        logger.error(f"delete individual failed: {e}")
+
+    await _delete_entity_index(ontology_id, "INDIVIDUAL", individual_id)
+    await _decrement_count(ontology_id, "individual_count")
+    return True
+
+
 async def create_axiom(
     ontology_id: str,
     axiom_type: str,

@@ -11,7 +11,6 @@ PostgreSQL 仅存本体元数据 + 实体索引（ID、名称、Jena URI）+ 计
 """
 
 from typing import Optional
-from src.database import SystemSession
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +32,12 @@ from src.services.jena_client import (
     JenaClient,
 )
 from src.services.ontology_metadata import get_metadata_store, OntologyMetadata
+from src.repositories import OntologyRepository, EntityIndexRepository
+from src.repositories.ontology import (
+    get_ontology_by_id as _get_ontology_by_id,
+    list_ontologies as _list_ontologies_repo,
+    delete_ontology_by_id as _delete_ontology_by_id,
+)
 from src.logging_config import get_logger
 from src.exceptions import OntologyNotFoundError, EntityNotFoundError
 
@@ -56,91 +61,59 @@ def _get_jena() -> Optional[JenaClient]:
 # 读操作：列表/元数据 → PostgreSQL
 # ============================================================================
 
+def _to_ontology_response(o: Ontology) -> OntologyResponse:
+    """将 Ontology 模型转换为响应 DTO"""
+    return OntologyResponse(
+        id=o.id,
+        name=o.name,
+        description=o.description or "",
+        version=o.version or "v1.0",
+        status=o.status or "draft",
+        datasource=None,
+        base_iri=o.base_iri,
+        imports=[],
+        prefix_mappings={
+            "owl": "http://www.w3.org/2002/07/owl#",
+            "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+            "xsd": "http://www.w3.org/2001/XMLSchema#",
+        },
+        object_count=o.class_count or 0,
+        data_property_count=o.dp_count or 0,
+        object_property_count=o.op_count or 0,
+        individual_count=o.individual_count or 0,
+        axiom_count=o.axiom_count or 0,
+        created_at=o.created_at.isoformat() if o.created_at else "",
+        updated_at=o.updated_at.isoformat() if o.updated_at else "",
+    )
+
+
 async def list_ontologies() -> list[OntologyResponse]:
     """本体列表：PostgreSQL（毫秒级）"""
-    async with SystemSession() as session:
-        result = await session.execute(
-            select(Ontology).order_by(Ontology.updated_at.desc())
-        )
-        ontologies = result.scalars().all()
-
-        return [
-            OntologyResponse(
-                id=o.id,
-                name=o.name,
-                description=o.description or "",
-                version=o.version or "v1.0",
-                status=o.status or "draft",
-                datasource=None,
-                base_iri=o.base_iri,
-                imports=[],
-                prefix_mappings={
-                    "owl": "http://www.w3.org/2002/07/owl#",
-                    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-                    "xsd": "http://www.w3.org/2001/XMLSchema#",
-                },
-                object_count=o.class_count or 0,
-                data_property_count=o.dp_count or 0,
-                object_property_count=o.op_count or 0,
-                individual_count=o.individual_count or 0,
-                axiom_count=o.axiom_count or 0,
-                created_at=o.created_at.isoformat() if o.created_at else "",
-                updated_at=o.updated_at.isoformat() if o.updated_at else "",
-            )
-            for o in ontologies
-        ]
+    ontologies, _ = await _list_ontologies_repo(limit=100, offset=0)
+    return [_to_ontology_response(o) for o in ontologies]
 
 
 async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
     """获取本体摘要：PostgreSQL"""
-    async with SystemSession() as session:
-        result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        o = result.scalar_one_or_none()
-        if not o:
-            return None
-
-        return OntologyResponse(
-            id=o.id,
-            name=o.name,
-            description=o.description or "",
-            version=o.version or "v1.0",
-            status=o.status or "draft",
-            datasource=None,
-            base_iri=o.base_iri,
-            imports=[],
-            prefix_mappings={
-                "owl": "http://www.w3.org/2002/07/owl#",
-                "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-                "xsd": "http://www.w3.org/2001/XMLSchema#",
-            },
-            object_count=o.class_count or 0,
-            data_property_count=o.dp_count or 0,
-            object_property_count=o.op_count or 0,
-            individual_count=o.individual_count or 0,
-            axiom_count=o.axiom_count or 0,
-            created_at=o.created_at.isoformat() if o.created_at else "",
-            updated_at=o.updated_at.isoformat() if o.updated_at else "",
-        )
+    o = await _get_ontology_by_id(ontology_id)
+    if not o:
+        return None
+    return _to_ontology_response(o)
 
 
 async def delete_ontology(ontology_id: str) -> bool:
     """删除本体：PostgreSQL + Jena 命名图（不删除数据集）"""
-    async with SystemSession() as session:
-        result = await session.execute(
-            select(Ontology).where(Ontology.id == ontology_id)
-        )
-        o = result.scalar_one_or_none()
-        if not o:
-            return False
-        
-        # 保存命名图 URI（删除本体后无法从 DB 获取）
-        tbox_graph_uri = o.tbox_graph_uri
-        abox_graph_uri = o.abox_graph_uri
-        
-        await session.delete(o)
-        await session.commit()
+    # 获取本体信息（删除前保存命名图 URI）
+    o = await _get_ontology_by_id(ontology_id)
+    if not o:
+        return False
+    
+    # 保存命名图 URI（删除本体后无法从 DB 获取）
+    tbox_graph_uri = o.tbox_graph_uri
+    abox_graph_uri = o.abox_graph_uri
+    
+    # 删除本体
+    await _delete_ontology_by_id(ontology_id)
 
     get_metadata_store().delete(ontology_id)
 

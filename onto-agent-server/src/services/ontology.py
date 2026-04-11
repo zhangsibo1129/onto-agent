@@ -122,7 +122,7 @@ async def get_ontology(ontology_id: str) -> Optional[OntologyResponse]:
 
 
 async def delete_ontology(ontology_id: str) -> bool:
-    """删除本体：PostgreSQL + Jena dataset（若有）"""
+    """删除本体：PostgreSQL + Jena 命名图（不删除数据集）"""
     async with SystemSession() as session:
         result = await session.execute(
             select(Ontology).where(Ontology.id == ontology_id)
@@ -130,32 +130,40 @@ async def delete_ontology(ontology_id: str) -> bool:
         o = result.scalar_one_or_none()
         if not o:
             return False
-        dataset = o.dataset
+        
+        # 保存命名图 URI（删除本体后无法从 DB 获取）
+        tbox_graph_uri = o.tbox_graph_uri
+        abox_graph_uri = o.abox_graph_uri
+        
         await session.delete(o)
         await session.commit()
 
     get_metadata_store().delete(ontology_id)
 
-    # 异步删除 Jena dataset
-    if dataset:
-        try:
-            import asyncio
-            jena = _get_jena()
-            if jena:
-                asyncio.create_task(_jena_delete_dataset(dataset))
-        except Exception:
-            pass
+    # 异步删除 Jena 命名图（不删除整个数据集）
+    try:
+        import asyncio
+        jena = _get_jena()
+        if jena:
+            asyncio.create_task(_jena_delete_named_graphs(tbox_graph_uri, abox_graph_uri))
+    except Exception:
+        pass
 
     return True
 
 
-async def _jena_delete_dataset(dataset: str):
+async def _jena_delete_named_graphs(tbox_graph_uri: str, abox_graph_uri: str = None):
+    """删除 Jena 中的命名图（不删除数据集）"""
     try:
         jena = _get_jena()
         if jena:
-            jena.delete_dataset(dataset)
+            # 删除 TBox 命名图
+            jena.delete_named_graph(tbox_graph_uri)
+            # 删除 ABox 命名图（如果存在）
+            if abox_graph_uri:
+                jena.delete_named_graph(abox_graph_uri)
     except Exception as e:
-        print(f"[Jena] delete dataset {dataset} failed: {e}")
+        print(f"[Jena] delete named graphs failed: tbox={tbox_graph_uri}, abox={abox_graph_uri}, error={e}")
 
 
 # ============================================================================

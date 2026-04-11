@@ -245,6 +245,15 @@ class JenaClient:
         except Exception as e:
             raise JenaServiceError(f"Failed to delete dataset {dataset}: {e}")
 
+    def delete_named_graph(self, graph_uri: str) -> bool:
+        """删除命名图（不清除整个数据集）"""
+        upd = f"DROP SILENT GRAPH <{graph_uri}>"
+        try:
+            return self._update(upd)
+        except Exception as e:
+            print(f"[Jena] delete named graph {graph_uri} failed: {e}")
+            return False
+
     def list_datasets(self) -> list[dict]:
         try:
             r = _fuseki_get("/$/datasets", timeout=5)

@@ -379,15 +379,15 @@ async def create_class_saga(
 
 def _jena_insert_class(graph_uri: str, triples: str) -> bool:
     """Jena 写入实现"""
-    from src.services.jena_client import get_jena_client_for_default_dataset
-    jena = get_jena_client_for_default_dataset()
+    from src.services.jena import get_jena_client
+    jena = get_jena_client()
     return jena.insert_named_graph(graph_uri, triples)
 
 
 def _jena_delete_entity(entity_uri: str) -> bool:
     """Jena 补偿删除实现"""
-    from src.services.jena_client import get_jena_client_for_default_dataset
-    jena = get_jena_client_for_default_dataset()
+    from src.services.jena import get_jena_client
+    jena = get_jena_client()
     return jena.delete_entity_from_tbox(entity_uri)
 
 

@@ -187,7 +187,7 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
     # 从 Jena 批量读取
     try:
         classes = jena.list_classes(base_iri)
-        data_properties = jena.list_data_properties(base_iri)
+        data_properties = jena.list_datatype_properties(base_iri)
         object_properties = jena.list_object_properties(base_iri)
         individuals = jena.list_individuals(base_iri)
     except Exception as e:

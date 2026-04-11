@@ -181,19 +181,21 @@ class JenaABoxMixin:
         rdf_data = "\n".join(triples)
         return self.graph_post(abox_graph, rdf_data)
 
-    def delete_individual(self, individual_uri: str) -> bool:
+    def delete_individual(self, individual_uri: str, abox_graph: str = None) -> bool:
         """
-        删除 Individual（跨图操作）
-
-        ⚠️ 注意：这会从所有图中删除该个体的三元组。
+        删除 Individual（从 abox 图中删除）
 
         Args:
             individual_uri: Individual 完整 URI
+            abox_graph: abox 图 URI（可选）
 
         Returns:
             bool: 是否成功
         """
-        upd = f"DELETE WHERE {{ <{individual_uri}> ?p ?o }}"
+        if abox_graph:
+            upd = f'DELETE {{ GRAPH <{abox_graph}> {{ <{individual_uri}> ?p ?o . }} }} WHERE {{ GRAPH <{abox_graph}> {{ <{individual_uri}> ?p ?o . }} }}'
+        else:
+            upd = f"DELETE WHERE {{ <{individual_uri}> ?p ?o }}"
         return self._update(upd)
 
     # ==================== 属性断言（带 abox 图限定） ====================

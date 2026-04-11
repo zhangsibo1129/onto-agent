@@ -532,10 +532,11 @@ async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
 
     class_uri = f"{base_iri}{class_id}"
 
-    # 1. Jena 删除
+    # 1. Jena 删除（指定 tbox 图）
     try:
         jena = get_jena_client(dataset)
-        jena.delete_class(class_uri)
+        tbox_graph = f"{base_iri}/tbox"
+        jena.delete_class(class_uri, tbox_graph=tbox_graph)
     except Exception as e:
         logger.error(f"delete class failed: {e}")
 
@@ -629,7 +630,7 @@ async def update_data_property(
     try:
         jena = get_jena_client(dataset)
         # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
-        jena.delete_datatype_property(prop_uri)
+        jena.delete_datatype_property(prop_uri, tbox_graph=tbox_graph_uri)
         jena.create_datatype_property(
             base_iri,
             prop_id,  # prop_local_name
@@ -674,7 +675,8 @@ async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
 
     try:
         jena = get_jena_client(dataset)
-        jena.delete_datatype_property(f"{base_iri}{prop_id}")
+        tbox_graph = f"{base_iri}/tbox"
+        jena.delete_datatype_property(f"{base_iri}{prop_id}", tbox_graph=tbox_graph)
     except Exception as e:
         logger.error(f"delete dataprop failed: {e}")
 
@@ -774,7 +776,7 @@ async def update_object_property(
 
     try:
         jena = get_jena_client(dataset)
-        jena.delete_object_property(prop_uri)
+        jena.delete_object_property(prop_uri, tbox_graph=tbox_graph_uri)
         jena.create_object_property(
             base_iri,
             prop_id,  # prop_local_name
@@ -819,7 +821,8 @@ async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
 
     try:
         jena = get_jena_client(dataset)
-        jena.delete_object_property(f"{base_iri}{prop_id}")
+        tbox_graph = f"{base_iri}/tbox"
+        jena.delete_object_property(f"{base_iri}{prop_id}", tbox_graph=tbox_graph)
     except Exception as e:
         logger.error(f"delete objprop failed: {e}")
 

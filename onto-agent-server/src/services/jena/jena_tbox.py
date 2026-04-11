@@ -332,19 +332,21 @@ class JenaTBoxMixin:
 
         return True
 
-    def delete_class(self, class_uri: str) -> bool:
+    def delete_class(self, class_uri: str, tbox_graph: str = None) -> bool:
         """
-        删除类（SPARQL DELETE，跨图操作）
-
-        ⚠️ 注意：这会从所有图中删除该类的三元组。
+        删除类（从 tbox 图中删除）
 
         Args:
             class_uri: 类完整 URI
+            tbox_graph: tbox 图 URI（可选）
 
         Returns:
             bool: 是否成功
         """
-        upd = f"DELETE WHERE {{ <{class_uri}> ?p ?o }}"
+        if tbox_graph:
+            upd = f'DELETE {{ GRAPH <{tbox_graph}> {{ <{class_uri}> ?p ?o . }} }} WHERE {{ GRAPH <{tbox_graph}> {{ <{class_uri}> ?p ?o . }} }}'
+        else:
+            upd = f"DELETE WHERE {{ <{class_uri}> ?p ?o }}"
         return self._update(upd)
 
     # ==================== 数据属性（tbox 图） ====================
@@ -450,17 +452,21 @@ class JenaTBoxMixin:
         rdf_data = "\n".join(triples)
         return self.graph_post(tbox_graph, rdf_data)
 
-    def delete_datatype_property(self, prop_uri: str) -> bool:
+    def delete_datatype_property(self, prop_uri: str, tbox_graph: str = None) -> bool:
         """
-        删除数据属性（跨图操作）
+        删除数据属性（从 tbox 图中删除）
 
         Args:
             prop_uri: 属性完整 URI
+            tbox_graph: tbox 图 URI（可选）
 
         Returns:
             bool: 是否成功
         """
-        upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
+        if tbox_graph:
+            upd = f'DELETE {{ GRAPH <{tbox_graph}> {{ <{prop_uri}> ?p ?o . }} }} WHERE {{ GRAPH <{tbox_graph}> {{ <{prop_uri}> ?p ?o . }} }}'
+        else:
+            upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
         return self._update(upd)
 
     # ==================== 对象属性（tbox 图） ====================
@@ -577,17 +583,21 @@ class JenaTBoxMixin:
         rdf_data = "\n".join(triples)
         return self.graph_post(tbox_graph, rdf_data)
 
-    def delete_object_property(self, prop_uri: str) -> bool:
+    def delete_object_property(self, prop_uri: str, tbox_graph: str = None) -> bool:
         """
-        删除对象属性（跨图操作）
+        删除对象属性（从 tbox 图中删除）
 
         Args:
             prop_uri: 属性完整 URI
+            tbox_graph: tbox 图 URI（可选）
 
         Returns:
             bool: 是否成功
         """
-        upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
+        if tbox_graph:
+            upd = f'DELETE {{ GRAPH <{tbox_graph}> {{ <{prop_uri}> ?p ?o . }} }} WHERE {{ GRAPH <{tbox_graph}> {{ <{prop_uri}> ?p ?o . }} }}'
+        else:
+            upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
         return self._update(upd)
 
     # ==================== 注解属性（tbox 图） ====================

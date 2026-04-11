@@ -80,8 +80,8 @@ async def create_data_property(ontology_id: str, data: DataPropertyCreate):
         ontology_id=ontology_id,
         name=data.name,
         display_name=data.display_name,
-        domain_class_name=data.domain_class_name,
-        range_type=data.range_type or "string",
+        domain_ids=data.domain_ids,
+        range_type=str(data.range_type) if data.range_type else "string",
         characteristics=data.characteristics or [],
     )
     return success_response(result)
@@ -123,10 +123,10 @@ async def create_object_property(ontology_id: str, data: ObjectPropertyCreate):
         ontology_id=ontology_id,
         name=data.name,
         display_name=data.display_name,
-        domain_class_name=data.domain_class_name,
-        range_class_name=data.range_class_name,
+        domain_ids=data.domain_ids,
+        range_ids=data.range_ids,
         characteristics=data.characteristics or [],
-        inverse_property_name=data.inverse_property_name,
+        inverse_of_id=data.inverse_of_id,
     )
     return success_response(result)
 

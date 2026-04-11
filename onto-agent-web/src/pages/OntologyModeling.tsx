@@ -49,6 +49,9 @@ export default function OntologyModeling() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedRelation, setSelectedRelation] = useState<GraphObjectProperty | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "dataProperty" | "objectProperty" | null>(null)
+  const [showEditModal, setShowEditModal] = useState<"class" | "dataProperty" | "objectProperty" | "individual" | null>(null)
+  const [editingEntity, setEditingEntity] = useState<OntologyClass | DataProperty | ObjectProperty | Individual | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: string; id: string; name: string } | null>(null)
   const [individuals, setIndividuals] = useState<Individual[]>([])
   const [individualsLoading, setIndividualsLoading] = useState(false)
   const [individualSearch, setIndividualSearch] = useState("")
@@ -128,7 +131,7 @@ export default function OntologyModeling() {
   const handleCreateObjectProperty = useCallback(
     async (name: string, displayName: string, domainId: string, rangeId: string) => {
       if (!id) return
-      const newProp = await ontologyApi.createObjectProperty(id, {
+      const newProp = await ontologyApi.createObjectProperty(id!, {
         name,
         displayName,
         domainIds: [domainId],
@@ -136,6 +139,95 @@ export default function OntologyModeling() {
       })
       setObjectProperties((prev) => [...prev, newProp])
       setShowAddModal(null)
+    },
+    [id]
+  )
+
+  // ======== Update Handlers ========
+
+  const handleUpdateClass = useCallback(
+    async (classId: string, updates: { displayName?: string; description?: string; superClasses?: string[] }) => {
+      if (!id) return
+      const updated = await ontologyApi.updateClass(id, classId, updates)
+      setClasses((prev) => prev.map((c) => (c.id === classId ? updated : c)))
+      setShowEditModal(null)
+      setEditingEntity(null)
+    },
+    [id]
+  )
+
+  const handleUpdateDataProperty = useCallback(
+    async (propId: string, updates: { displayName?: string; domainIds?: string[]; rangeType?: string }) => {
+      if (!id) return
+      const updated = await ontologyApi.updateDataProperty(id, propId, updates)
+      setDataProperties((prev) => prev.map((p) => (p.id === propId ? updated : p)))
+      setShowEditModal(null)
+      setEditingEntity(null)
+    },
+    [id]
+  )
+
+  const handleUpdateObjectProperty = useCallback(
+    async (propId: string, updates: { displayName?: string; domainIds?: string[]; rangeIds?: string[] }) => {
+      if (!id) return
+      const updated = await ontologyApi.updateObjectProperty(id, propId, updates)
+      setObjectProperties((prev) => prev.map((p) => (p.id === propId ? updated : p)))
+      setShowEditModal(null)
+      setEditingEntity(null)
+    },
+    [id]
+  )
+
+  const handleUpdateIndividual = useCallback(
+    async (individualId: string, updates: { displayName?: string; propertyValues?: Record<string, unknown> }) => {
+      if (!id) return
+      const updated = await ontologyApi.updateIndividual(id, individualId, updates)
+      setIndividuals((prev) => prev.map((i) => (i.id === individualId ? updated : i)))
+      setShowEditModal(null)
+      setEditingEntity(null)
+    },
+    [id]
+  )
+
+  // ======== Delete Handlers ========
+
+  const handleDeleteClass = useCallback(
+    async (classId: string) => {
+      if (!id) return
+      await ontologyApi.deleteClass(id, classId)
+      setClasses((prev) => prev.filter((c) => c.id !== classId))
+      if (selectedClassId === classId) setSelectedClassId(null)
+      setShowDeleteConfirm(null)
+    },
+    [id, selectedClassId]
+  )
+
+  const handleDeleteDataProperty = useCallback(
+    async (propId: string) => {
+      if (!id) return
+      await ontologyApi.deleteDataProperty(id, propId)
+      setDataProperties((prev) => prev.filter((p) => p.id !== propId))
+      setShowDeleteConfirm(null)
+    },
+    [id]
+  )
+
+  const handleDeleteObjectProperty = useCallback(
+    async (propId: string) => {
+      if (!id) return
+      await ontologyApi.deleteObjectProperty(id, propId)
+      setObjectProperties((prev) => prev.filter((p) => p.id !== propId))
+      setShowDeleteConfirm(null)
+    },
+    [id]
+  )
+
+  const handleDeleteIndividual = useCallback(
+    async (individualId: string) => {
+      if (!id) return
+      await ontologyApi.deleteIndividual(id, individualId)
+      setIndividuals((prev) => prev.filter((i) => i.id !== individualId))
+      setShowDeleteConfirm(null)
     },
     [id]
   )
@@ -240,6 +332,30 @@ export default function OntologyModeling() {
 
         <div className="toolbar-actions">
           <div className="toolbar-right">
+            <div className="btn-group-add">
+              <button className="btn-toolbar" onClick={() => setShowAddModal("class")}>
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                  <line x1="8" y1="5" x2="8" y2="11" stroke="currentColor" strokeWidth="1.2" />
+                  <line x1="5" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.2" />
+                </svg>
+                添加类
+              </button>
+              <button className="btn-toolbar" onClick={() => setShowAddModal("dataProperty")}>
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                  <line x1="8" y1="5" x2="8" y2="11" stroke="currentColor" strokeWidth="1.2" />
+                </svg>
+                添加属性
+              </button>
+              <button className="btn-toolbar" onClick={() => setShowAddModal("objectProperty")}>
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <line x1="1" y1="8" x2="10" y2="8" stroke="currentColor" strokeWidth="1.2" />
+                  <polygon points="8,5 12,8 8,11" fill="currentColor" />
+                </svg>
+                添加关系
+              </button>
+            </div>
             <div className="btn-group-secondary">
               <button className="btn-toolbar">
                 <svg viewBox="0 0 16 16" width="14" height="14">
@@ -283,11 +399,34 @@ export default function OntologyModeling() {
                   </svg>
                   <span className="panel-name">{selectedRelation.displayName || selectedRelation.name}</span>
                 </div>
-                <button className="panel-close" onClick={() => setSelectedRelation(null)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14">
-                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
+                <div className="panel-actions">
+                  <button
+                    className="btn-icon"
+                    title="编辑关系"
+                    onClick={() => {
+                      setEditingEntity(selectedRelation)
+                      setShowEditModal("objectProperty")
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button
+                    className="btn-icon btn-icon-danger"
+                    title="删除关系"
+                    onClick={() => setShowDeleteConfirm({ type: "objectProperty", id: selectedRelation.id, name: selectedRelation.displayName || selectedRelation.name })}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button className="panel-close" onClick={() => setSelectedRelation(null)}>
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className="panel-body">
                 <div className="panel-section">
@@ -351,11 +490,34 @@ export default function OntologyModeling() {
                   </svg>
                   <span className="panel-name">{selectedClass.displayName || selectedClass.name}</span>
                 </div>
-                <button className="panel-close" onClick={() => setSelectedClassId(null)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14">
-                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
+                <div className="panel-actions">
+                  <button 
+                    className="btn-icon" 
+                    title="编辑类"
+                    onClick={() => {
+                      setEditingEntity(selectedClass)
+                      setShowEditModal("class")
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button 
+                    className="btn-icon btn-icon-danger" 
+                    title="删除类"
+                    onClick={() => setShowDeleteConfirm({ type: "class", id: selectedClass.id, name: selectedClass.displayName || selectedClass.name })}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button className="panel-close" onClick={() => setSelectedClassId(null)}>
+                    <svg viewBox="0 0 24 24" width="14" height="14">
+                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
               <div className="panel-body">
@@ -390,7 +552,16 @@ export default function OntologyModeling() {
 
                 {/* Data Properties */}
                 <div className="panel-section">
-                  <div className="section-title">属性</div>
+                  <div className="section-title">
+                    属性
+                    <button 
+                      className="btn-link btn-link-xs" 
+                      onClick={() => setShowAddModal("dataProperty")}
+                      title="添加属性"
+                    >
+                      + 添加
+                    </button>
+                  </div>
                   {selectedClassDataProperties.length > 0 ? (
                     <div className="props-list">
                       {selectedClassDataProperties.map((prop) => (
@@ -402,6 +573,29 @@ export default function OntologyModeling() {
                               <span key={c} className="char-badge">{CHARACTERISTIC_LABELS[c] || c}</span>
                             ))}
                           </span>
+                          <div className="prop-actions">
+                            <button 
+                              className="btn-icon btn-icon-xs" 
+                              title="编辑属性"
+                              onClick={() => {
+                                setEditingEntity(prop)
+                                setShowEditModal("dataProperty")
+                              }}
+                            >
+                              <svg viewBox="0 0 24 24" width="12" height="12">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
+                              </svg>
+                            </button>
+                            <button 
+                              className="btn-icon btn-icon-xs btn-icon-danger" 
+                              title="删除属性"
+                              onClick={() => setShowDeleteConfirm({ type: "dataProperty", id: prop.id, name: prop.displayName || prop.name })}
+                            >
+                              <svg viewBox="0 0 24 24" width="12" height="12">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor"/>
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -517,6 +711,11 @@ export default function OntologyModeling() {
                           individual={ind}
                           dataProperties={dataProperties}
                           objectProperties={objectProperties}
+                          onEdit={(ind) => {
+                            setEditingEntity(ind)
+                            setShowEditModal("individual")
+                          }}
+                          onDelete={(id) => setShowDeleteConfirm({ type: "individual", id, name: individuals.find(i => i.id === id)?.displayName || id })}
                         />
                       ))
                     ) : (
@@ -687,6 +886,214 @@ export default function OntologyModeling() {
                 }}
               >
                 添加
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Edit Modal ---- */}
+      {showEditModal && editingEntity && (
+        <div className="modal-overlay" onClick={() => { setShowEditModal(null); setEditingEntity(null) }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                {showEditModal === "class" && "编辑类"}
+                {showEditModal === "dataProperty" && "编辑数据属性"}
+                {showEditModal === "objectProperty" && "编辑对象属性"}
+                {showEditModal === "individual" && "编辑实例"}
+              </h3>
+              <button className="modal-close" onClick={() => { setShowEditModal(null); setEditingEntity(null) }}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {showEditModal === "class" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">显示名称</label>
+                    <input type="text" className="form-input" id="editClassDisplayName" defaultValue={(editingEntity as OntologyClass).displayName || ""} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">父类</label>
+                    <select className="form-select" id="editClassSuperClass" defaultValue={(editingEntity as OntologyClass).superClasses?.[0] || ""}>
+                      <option value="">无（顶层类）</option>
+                      {classes.filter((c) => c.id !== (editingEntity as OntologyClass).id).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName || c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">描述</label>
+                    <input type="text" className="form-input" id="editClassDescription" defaultValue={(editingEntity as OntologyClass).description || ""} />
+                  </div>
+                </>
+              )}
+
+              {showEditModal === "dataProperty" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">显示名称</label>
+                    <input type="text" className="form-input" id="editPropDisplayName" defaultValue={(editingEntity as DataProperty).displayName || ""} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">所属类</label>
+                    <select className="form-select" id="editPropDomain" defaultValue={(editingEntity as DataProperty).domainIds?.[0] || ""}>
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName || c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">数据类型</label>
+                    <select className="form-select" id="editPropRange" defaultValue={(editingEntity as DataProperty).rangeType || "string"}>
+                      {DATA_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {showEditModal === "objectProperty" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">显示名称</label>
+                    <input type="text" className="form-input" id="editRelDisplayName" defaultValue={(editingEntity as ObjectProperty).displayName || ""} />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">源类</label>
+                      <select className="form-select" id="editRelSource" defaultValue={(editingEntity as ObjectProperty).domainIds?.[0] || ""}>
+                        {classes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.displayName || c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">目标类</label>
+                      <select className="form-select" id="editRelTarget" defaultValue={(editingEntity as ObjectProperty).rangeIds?.[0] || ""}>
+                        {classes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.displayName || c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {showEditModal === "individual" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">显示名称</label>
+                    <input type="text" className="form-input" id="editIndDisplayName" defaultValue={(editingEntity as Individual).displayName || ""} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">说明</label>
+                    <p className="form-hint">实例属性值编辑功能正在开发中...</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => { setShowEditModal(null); setEditingEntity(null) }}>
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (showEditModal === "class") {
+                    const displayInput = document.getElementById("editClassDisplayName") as HTMLInputElement
+                    const superSelect = document.getElementById("editClassSuperClass") as HTMLSelectElement
+                    const descInput = document.getElementById("editClassDescription") as HTMLInputElement
+                    handleUpdateClass((editingEntity as OntologyClass).id, {
+                      displayName: displayInput.value || undefined,
+                      description: descInput.value || undefined,
+                      superClasses: superSelect.value ? [superSelect.value] : undefined,
+                    })
+                  } else if (showEditModal === "dataProperty") {
+                    const displayInput = document.getElementById("editPropDisplayName") as HTMLInputElement
+                    const domainSelect = document.getElementById("editPropDomain") as HTMLSelectElement
+                    const rangeSelect = document.getElementById("editPropRange") as HTMLSelectElement
+                    handleUpdateDataProperty((editingEntity as DataProperty).id, {
+                      displayName: displayInput.value || undefined,
+                      domainIds: domainSelect.value ? [domainSelect.value] : undefined,
+                      rangeType: rangeSelect.value as DataProperty["rangeType"],
+                    })
+                  } else if (showEditModal === "objectProperty") {
+                    const displayInput = document.getElementById("editRelDisplayName") as HTMLInputElement
+                    const sourceSelect = document.getElementById("editRelSource") as HTMLSelectElement
+                    const targetSelect = document.getElementById("editRelTarget") as HTMLSelectElement
+                    handleUpdateObjectProperty((editingEntity as ObjectProperty).id, {
+                      displayName: displayInput.value || undefined,
+                      domainIds: sourceSelect.value ? [sourceSelect.value] : undefined,
+                      rangeIds: targetSelect.value ? [targetSelect.value] : undefined,
+                    })
+                  } else if (showEditModal === "individual") {
+                    const displayInput = document.getElementById("editIndDisplayName") as HTMLInputElement
+                    handleUpdateIndividual((editingEntity as Individual).id, {
+                      displayName: displayInput.value || undefined,
+                    })
+                  }
+                }}
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Delete Confirmation Modal ---- */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
+          <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">确认删除</h3>
+              <button className="modal-close" onClick={() => setShowDeleteConfirm(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-text">
+                确定要删除 "{showDeleteConfirm.name}" 吗？
+              </p>
+              <p className="confirm-hint">
+                {showDeleteConfirm.type === "class" && "删除类将同时删除其所有实例和子类关系。"}
+                {showDeleteConfirm.type === "dataProperty" && "删除数据属性将移除所有实例上的相关属性值。"}
+                {showDeleteConfirm.type === "objectProperty" && "删除对象属性将移除所有实例上的相关关系。"}
+                {showDeleteConfirm.type === "individual" && "删除实例将无法恢复。"}
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowDeleteConfirm(null)}>
+                取消
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  if (showDeleteConfirm.type === "class") {
+                    handleDeleteClass(showDeleteConfirm.id)
+                  } else if (showDeleteConfirm.type === "dataProperty") {
+                    handleDeleteDataProperty(showDeleteConfirm.id)
+                  } else if (showDeleteConfirm.type === "objectProperty") {
+                    handleDeleteObjectProperty(showDeleteConfirm.id)
+                  } else if (showDeleteConfirm.type === "individual") {
+                    handleDeleteIndividual(showDeleteConfirm.id)
+                  }
+                }}
+              >
+                删除
               </button>
             </div>
           </div>

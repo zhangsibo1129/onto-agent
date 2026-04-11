@@ -14,6 +14,7 @@ interface IndividualCardProps {
     displayName?: string;
   }>;
   onClick?: (individual: Individual) => void;
+  onEdit?: (individual: Individual) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -22,6 +23,7 @@ export function IndividualCard({
   dataProperties,
   objectProperties,
   onClick,
+  onEdit,
   onDelete,
 }: IndividualCardProps) {
   // 获取属性显示名称
@@ -45,17 +47,30 @@ export function IndividualCard({
           </span>
           <span className="individual-id">({individual.name})</span>
         </div>
-        {onDelete && (
-          <button
-            className="individual-delete"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(individual.id);
-            }}
-          >
-            删除
-          </button>
-        )}
+        <div className="individual-actions">
+          {onEdit && (
+            <button
+              className="individual-edit"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(individual);
+              }}
+            >
+              编辑
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="individual-delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(individual.id);
+              }}
+            >
+              删除
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="individual-card-body">

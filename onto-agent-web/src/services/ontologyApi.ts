@@ -514,4 +514,78 @@ export const ontologyApi = {
       `/ontologies/${ontologyId}/versions/${encodeURIComponent(version)}`,
       { method: "DELETE" }
     ),
+
+  // ============================================================
+  // Ontology Update
+  // ============================================================
+  updateOntology: (ontologyId: string, dto: Partial<CreateOntologyDto>) =>
+    request<Ontology>(`/ontologies/${ontologyId}`, {
+      method: "PUT",
+      body: JSON.stringify(dto),
+    }),
+
+  // ============================================================
+  // Class CRUD
+  // ============================================================
+  updateClass: (ontologyId: string, classId: string, dto: Partial<CreateClassDto>) =>
+    request<OntologyClass>(
+      `/ontologies/${ontologyId}/classes/${classId}`,
+      { method: "PUT", body: JSON.stringify(dto) }
+    ),
+
+  deleteClass: (ontologyId: string, classId: string) =>
+    request<void>(
+      `/ontologies/${ontologyId}/classes/${classId}`,
+      { method: "DELETE" }
+    ),
+
+  // ============================================================
+  // Data Property CRUD
+  // ============================================================
+  updateDataProperty: (ontologyId: string, propId: string, dto: Partial<CreateDataPropertyDto>) =>
+    request<DataProperty>(
+      `/ontologies/${ontologyId}/data-properties/${propId}`,
+      { method: "PUT", body: JSON.stringify(dto) }
+    ),
+
+  deleteDataProperty: (ontologyId: string, propId: string) =>
+    request<void>(
+      `/ontologies/${ontologyId}/data-properties/${propId}`,
+      { method: "DELETE" }
+    ),
+
+  // ============================================================
+  // Object Property CRUD
+  // ============================================================
+  updateObjectProperty: (ontologyId: string, propId: string, dto: Partial<CreateObjectPropertyDto>) =>
+    request<ObjectProperty>(
+      `/ontologies/${ontologyId}/object-properties/${propId}`,
+      { method: "PUT", body: JSON.stringify(dto) }
+    ),
+
+  deleteObjectProperty: (ontologyId: string, propId: string) =>
+    request<void>(
+      `/ontologies/${ontologyId}/object-properties/${propId}`,
+      { method: "DELETE" }
+    ),
+
+  // ============================================================
+  // Individual CRUD
+  // ============================================================
+  getIndividual: (ontologyId: string, individualId: string) =>
+    request<Individual>(
+      `/ontologies/${ontologyId}/individuals/${individualId}`
+    ),
+
+  updateIndividual: (ontologyId: string, individualId: string, dto: Partial<CreateIndividualDto>) =>
+    request<Individual>(
+      `/ontologies/${ontologyId}/individuals/${individualId}`,
+      { method: "PUT", body: JSON.stringify(dto) }
+    ),
+
+  deleteIndividual: (ontologyId: string, individualId: string) =>
+    request<void>(
+      `/ontologies/${ontologyId}/individuals/${individualId}`,
+      { method: "DELETE" }
+    ),
 }

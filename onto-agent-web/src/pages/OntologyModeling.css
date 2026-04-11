@@ -825,3 +825,159 @@
   color: #94a3b8;
   font-size: 12px;
 }
+
+/* Panel Actions */
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Icon Buttons */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-icon:hover {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+}
+
+.btn-icon.btn-icon-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.btn-icon.btn-icon-xs {
+  width: 22px;
+  height: 22px;
+}
+
+/* Prop Actions */
+.prop-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.prop-row:hover .prop-actions {
+  opacity: 1;
+}
+
+/* Link Buttons */
+.btn-link {
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-link:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.btn-link.btn-link-xs {
+  font-size: 11px;
+  padding: 1px 4px;
+}
+
+/* Individual Card Actions */
+.individual-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.individual-edit,
+.individual-delete {
+  background: none;
+  border: none;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.individual-edit {
+  color: #6366f1;
+}
+
+.individual-edit:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.individual-delete {
+  color: #94a3b8;
+}
+
+.individual-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Small Modal */
+.modal-sm {
+  max-width: 400px;
+}
+
+/* Confirm Text */
+.confirm-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.confirm-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Form Hint */
+.form-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* Section Title with Action */
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Button Group Add */
+.btn-group-add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-group-add .btn-toolbar {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.btn-group-add .btn-toolbar:hover {
+  background: rgba(99, 102, 241, 0.2);
+}

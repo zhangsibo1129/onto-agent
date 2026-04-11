@@ -39,6 +39,15 @@ from src.schemas.ontology import (
     OntologyResponse,
     OntologyDetailResponse,
 )
+from src.constants import (
+    JENA_DEFAULT_HOST,
+    JENA_DEFAULT_PORT,
+    JENA_TIMEOUT_SECONDS,
+)
+from src.exceptions import JenaServiceError, JenaQueryError
+from src.logging_config import get_logger
+
+logger = get_logger("jena")
 
 load_dotenv()
 
@@ -47,16 +56,15 @@ load_dotenv()
 # ============================================================================
 
 
-@lru_cache
 def get_fuseki_settings() -> dict:
     return {
-        "fuseki_url": getenv("FUSEKI_URL", "http://localhost:3030"),
+        "fuseki_url": getenv("FUSEKI_URL", f"http://{JENA_DEFAULT_HOST}:{JENA_DEFAULT_PORT}"),
         "username": getenv("FUSEKI_USER", "admin"),
         "password": getenv("FUSEKI_PASSWORD", ""),
     }
 
 
-DEFAULT_FUSEKI_URL = "http://localhost:3030"
+DEFAULT_FUSEKI_URL = f"http://{JENA_DEFAULT_HOST}:{JENA_DEFAULT_PORT}"
 
 NAMESPACES = {
     "owl": "http://www.w3.org/2002/07/owl#",
@@ -67,19 +75,11 @@ NAMESPACES = {
 
 
 # ============================================================================
-# Exceptions
+# Exceptions (已迁移到 src/exceptions.py，此处保留向后兼容)
 # ============================================================================
 
 
-class JenaServiceError(Exception):
-    pass
-
-
 class JenaConnectionError(JenaServiceError):
-    pass
-
-
-class JenaQueryError(JenaServiceError):
     pass
 
 
@@ -251,7 +251,7 @@ class JenaClient:
         try:
             return self._update(upd)
         except Exception as e:
-            print(f"[Jena] delete named graph {graph_uri} failed: {e}")
+            logger.error(f"delete named graph {graph_uri} failed: {e}")
             return False
 
     def list_datasets(self) -> list[dict]:

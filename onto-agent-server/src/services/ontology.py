@@ -33,8 +33,12 @@ from src.services.jena_client import (
     JenaClient,
 )
 from src.services.ontology_metadata import get_metadata_store, OntologyMetadata
+from src.logging_config import get_logger
+from src.exceptions import OntologyNotFoundError, EntityNotFoundError
 
 import httpx
+
+logger = get_logger("ontology")
 
 
 # ============================================================================
@@ -163,7 +167,7 @@ async def _jena_delete_named_graphs(tbox_graph_uri: str, abox_graph_uri: str = N
             if abox_graph_uri:
                 jena.delete_named_graph(abox_graph_uri)
     except Exception as e:
-        print(f"[Jena] delete named graphs failed: tbox={tbox_graph_uri}, abox={abox_graph_uri}, error={e}")
+        logger.error(f"delete named graphs failed: tbox={tbox_graph_uri}, abox={abox_graph_uri}, error={e}")
 
 
 # ============================================================================
@@ -323,7 +327,7 @@ async def get_individuals(
         jena = get_jena_client_for_dataset(dataset)
         return jena.list_individuals(base_iri, class_id=class_id, search=search)
     except Exception as e:
-        print(f"[WARN] get_individuals failed: {e}")
+        logger.warning(f"get_individuals failed: {e}")
         return []
 
 
@@ -368,7 +372,7 @@ async def create_ontology(
         ds_jena = get_jena_client_for_dataset(dataset)
         ds_jena.create_ontology(name=name, base_iri=base_iri, description=description)
     except Exception as e:
-        print(f"[Jena] create ontology failed: {e}")
+        logger.error(f"create ontology failed: {e}")
 
     # 2. PostgreSQL：写入本体元数据
     async with SystemSession() as session:
@@ -461,7 +465,7 @@ async def create_ontology_class(
             super_classes=super_iris if super_iris else None,
         )
     except Exception as e:
-        print(f"[Jena] create class failed: {e}")
+        logger.error(f"create class failed: {e}")
 
     # 2. PostgreSQL 索引
     await _index_entity(ontology_id, "CLASS", name, display_name, class_uri)
@@ -505,7 +509,7 @@ async def update_ontology_class(
         jena = get_jena_client_for_dataset(dataset)
         jena.update_class(class_uri, display_name=display_name, description=description)
     except Exception as e:
-        print(f"[Jena] update class failed: {e}")
+        logger.error(f"update class failed: {e}")
 
     # PostgreSQL 索引更新（名称/显示名变化）
     if name or display_name:
@@ -546,7 +550,7 @@ async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
         jena = get_jena_client_for_dataset(dataset)
         jena.delete_class(class_uri)
     except Exception as e:
-        print(f"[Jena] delete class failed: {e}")
+        logger.error(f"delete class failed: {e}")
 
     # 2. PostgreSQL 索引删除
     await _delete_entity_index(ontology_id, "CLASS", class_id)
@@ -584,7 +588,7 @@ async def create_data_property(
             characteristics=characteristics,
         )
     except Exception as e:
-        print(f"[Jena] create dataprop failed: {e}")
+        logger.error(f"create dataprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
     await _index_entity(ontology_id, "DP", name, display_name, prop_uri)
@@ -634,7 +638,7 @@ async def update_data_property(
             characteristics=characteristics,
         )
     except Exception as e:
-        print(f"[Jena] update dataprop failed: {e}")
+        logger.error(f"update dataprop failed: {e}")
 
     # 索引更新
     if name or display_name:
@@ -671,7 +675,7 @@ async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
         jena = get_jena_client_for_dataset(dataset)
         jena.delete_datatype_property(f"{base_iri}{prop_id}")
     except Exception as e:
-        print(f"[Jena] delete dataprop failed: {e}")
+        logger.error(f"delete dataprop failed: {e}")
 
     await _delete_entity_index(ontology_id, "DP", prop_id)
     await _decrement_count(ontology_id, "dp_count")
@@ -712,7 +716,7 @@ async def create_object_property(
             inverse_of=inverse_of,
         )
     except Exception as e:
-        print(f"[Jena] create objprop failed: {e}")
+        logger.error(f"create objprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
     await _index_entity(ontology_id, "OP", name, display_name, prop_uri)
@@ -766,7 +770,7 @@ async def update_object_property(
             inverse_of=f"{base_iri}{inverse_of_id}" if inverse_of_id else None,
         )
     except Exception as e:
-        print(f"[Jena] update objprop failed: {e}")
+        logger.error(f"update objprop failed: {e}")
 
     if name or display_name:
         async with SystemSession() as session:
@@ -802,7 +806,7 @@ async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
         jena = get_jena_client_for_dataset(dataset)
         jena.delete_object_property(f"{base_iri}{prop_id}")
     except Exception as e:
-        print(f"[Jena] delete objprop failed: {e}")
+        logger.error(f"delete objprop failed: {e}")
 
     await _delete_entity_index(ontology_id, "OP", prop_id)
     await _decrement_count(ontology_id, "op_count")

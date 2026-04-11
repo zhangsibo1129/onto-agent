@@ -20,6 +20,17 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import text
 
+from src.constants import (
+    POSTGRES_DEFAULT_HOST,
+    POSTGRES_SYSTEM_PORT,
+    POSTGRES_BUSINESS_PORT,
+    POSTGRES_SYSTEM_DB,
+    POSTGRES_BUSINESS_DB,
+)
+from src.logging_config import get_logger
+
+logger = get_logger("database")
+
 # 加载环境变量
 load_dotenv()
 
@@ -34,16 +45,27 @@ def create_session_maker(db_url: str):
     return sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+def _build_db_url(host: str, port: int, db_name: str) -> str:
+    """构建数据库连接 URL"""
+    return f"postgresql+asyncpg://postgres:postgres@{host}:{port}/{db_name}"
+
+
 # ==================== 系统数据库 ====================
 # 系统内部数据：ontologies, entity_index, ontology_versions, operation_logs
-SYSTEM_DB_URL = os.getenv("SYSTEM_DB_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/system_db")
+SYSTEM_DB_URL = os.getenv(
+    "SYSTEM_DB_URL",
+    _build_db_url(POSTGRES_DEFAULT_HOST, POSTGRES_SYSTEM_PORT, POSTGRES_SYSTEM_DB)
+)
 system_engine = create_async_engine(SYSTEM_DB_URL, echo=False)
 SystemSession = create_session_maker(SYSTEM_DB_URL)
 
 
 # ==================== 本体业务数据库 ====================
 # 本体业务数据：datasources, mappings, sync_tasks 等
-BUSINESS_DB_URL = os.getenv("BUSINESS_DB_URL", "postgresql+asyncpg://postgres:postgres@localhost:5433/onto_agent")
+BUSINESS_DB_URL = os.getenv(
+    "BUSINESS_DB_URL",
+    _build_db_url(POSTGRES_DEFAULT_HOST, POSTGRES_BUSINESS_PORT, POSTGRES_BUSINESS_DB)
+)
 business_engine = create_async_engine(BUSINESS_DB_URL, echo=False)
 BusinessSession = create_session_maker(BUSINESS_DB_URL)
 
@@ -84,11 +106,11 @@ async def init_db():
     try:
         async with SystemSession() as session:
             await session.execute(text("SELECT 1"))
-        print("✓ System database connected")
+        logger.info("System database connected")
         
         async with BusinessSession() as session:
             await session.execute(text("SELECT 1"))
-        print("✓ Business database connected")
+        logger.info("Business database connected")
             
     except Exception as e:
-        print(f"⚠ Database init warning: {e}")
+        logger.warning(f"Database init warning: {e}")

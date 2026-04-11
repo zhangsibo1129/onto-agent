@@ -176,9 +176,6 @@ export default function OntologyModeling() {
   const selectedClassDataProperties = dataProperties.filter((p) =>
     p.domainIds?.includes(selectedClassId || "") || false
   )
-  const selectedClassObjectProperties = objectProperties.filter((p) =>
-    p.domainIds?.includes(selectedClassId || "") || false
-  )
   const incomingRelations = relations.filter((r) => r.targetId === selectedClassId)
   const outgoingRelations = relations.filter((r) => r.sourceId === selectedClassId)
 

@@ -311,7 +311,6 @@ function renderNode(
   globalScale: number,
   selectedId: string | null,
   hoveredId: string | null,
-  hoveredLinkId: string | null,
   hoveredLinkNodes: Set<string>
 ) {
   const isSelected = node.id === selectedId
@@ -743,7 +742,7 @@ export default function OntologyGraph({
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      renderNode(ctx, node, globalScale, selectedIdRef.current, hoveredId, hoveredLinkId, hoveredLinkNodes)
+      renderNode(ctx, node, globalScale, selectedIdRef.current, hoveredId, hoveredLinkNodes)
     },
     [hoveredId, hoveredLinkId, hoveredLinkNodes]
   )
@@ -882,7 +881,6 @@ export default function OntologyGraph({
         enableNodeDrag={true}
         enableZoomInteraction={true}
         enablePanInteraction={true}
-        enableLinkInteraction={true}
         minZoom={0.75}
         maxZoom={2}
       />

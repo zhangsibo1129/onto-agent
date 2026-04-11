@@ -70,7 +70,7 @@ export function IndividualCard({
                     {getPropName(assertion.propertyId)}:
                   </span>
                   <span className="assertion-value">
-                    "{assertion.value}"
+                    "{String(assertion.value)}"
                   </span>
                 </div>
               ))}

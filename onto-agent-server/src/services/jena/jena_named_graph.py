@@ -40,7 +40,7 @@ class JenaNamedGraphMixin:
         GROUP BY ?graph
         """
         try:
-            results = self.base._query(q)
+            results = self._query(q)
             return [
                 {
                     "uri": row.get("graph", {}).get("value", ""),
@@ -58,7 +58,7 @@ class JenaNamedGraphMixin:
         INSERT DATA {{ GRAPH <{graph_uri}> {{ {triples} }} }}
         """
         try:
-            return self.base._update(upd)
+            return self._update(upd)
         except Exception as e:
             logger.error(f"insert_named_graph failed: {e}")
             return False
@@ -67,7 +67,7 @@ class JenaNamedGraphMixin:
         """删除命名图（清除所有三元组）"""
         upd = f"DROP SILENT GRAPH <{graph_uri}>"
         try:
-            return self.base._update(upd)
+            return self._update(upd)
         except Exception as e:
             logger.error(f"delete_named_graph failed: {e}")
             return False
@@ -83,7 +83,7 @@ class JenaNamedGraphMixin:
         WHERE {{ GRAPH <{graph_uri}> {{ {where_clause} }} }}
         """
         try:
-            return self.base._query(q)
+            return self._query(q)
         except Exception as e:
             logger.error(f"query_named_graph failed: {e}")
             return []
@@ -91,7 +91,7 @@ class JenaNamedGraphMixin:
     def copy_graph(self, source_graph: str, target_graph: str) -> bool:
         """复制源命名图到目标命名图（用于版本快照）"""
         # 先清空目标图
-        self.base._update(f"DROP SILENT GRAPH <{target_graph}>")
+        self._update(f"DROP SILENT GRAPH <{target_graph}>")
         
         # 复制数据
         upd = f"""
@@ -100,7 +100,7 @@ class JenaNamedGraphMixin:
         WHERE {{ ?s ?p ?o }}
         """
         try:
-            return self.base._update(upd)
+            return self._update(upd)
         except Exception as e:
             logger.error(f"copy_graph failed: {e}")
             return False
@@ -195,7 +195,7 @@ class JenaNamedGraphMixin:
         """从 TBox 删除实体（类/属性）"""
         upd = f"DELETE WHERE {{ <{entity_uri}> ?p ?o }}"
         try:
-            return self.base._update(upd)
+            return self._update(upd)
         except Exception as e:
             logger.error(f"delete_entity_from_tbox failed: {e}")
             return False

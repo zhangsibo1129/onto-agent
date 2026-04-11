@@ -47,7 +47,7 @@ class JenaTBoxMixin:
             OPTIONAL { ?ont rdfs:comment ?comment }
         }
         """
-        return self.base._query(q)
+        return self._query(q)
     
     def get_ontology_detail(self, ontology_iri: str) -> dict:
         """获取本体完整详情"""
@@ -59,7 +59,7 @@ class JenaTBoxMixin:
         }}
         LIMIT 1
         """
-        meta_results = self.base._query(meta_q)
+        meta_results = self._query(meta_q)
         
         classes = self.list_classes(ontology_iri)
         data_properties = self.list_datatype_properties(ontology_iri)
@@ -95,7 +95,7 @@ class JenaTBoxMixin:
             OPTIONAL {{ ?class rdfs:comment ?comment }}
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         
         classes = []
         for row in results:
@@ -136,7 +136,7 @@ class JenaTBoxMixin:
                 triples.append(f"<{class_uri}> <{RDFS.subClassOf}> <{sc_uri}> .")
         
         upd = "INSERT DATA { " + " ".join(triples) + " }"
-        return self.base._update(upd)
+        return self._update(upd)
     
     def update_class(
         self,
@@ -151,7 +151,7 @@ class JenaTBoxMixin:
             INSERT {{ <{class_uri}> <{RDFS.label}> \"{display_name}\" }}
             WHERE {{ <{class_uri}> <{RDFS.label}> ?old }}
             """
-            self.base._update(upd)
+            self._update(upd)
         
         if description:
             upd = f"""
@@ -159,14 +159,14 @@ class JenaTBoxMixin:
             INSERT {{ <{class_uri}> <{RDFS.comment}> \"{description}\" }}
             WHERE {{ <{class_uri}> <{RDFS.comment}> ?old }}
             """
-            self.base._update(upd)
+            self._update(upd)
         
         return True
     
     def delete_class(self, class_uri: str) -> bool:
         """删除类"""
         upd = f"DELETE WHERE {{ <{class_uri}> ?p ?o }}"
-        return self.base._update(upd)
+        return self._update(upd)
     
     # ==================== 数据属性 ====================
     
@@ -185,7 +185,7 @@ class JenaTBoxMixin:
             OPTIONAL {{ ?prop rdfs:range ?range }}
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         
         props = []
         for row in results:
@@ -233,12 +233,12 @@ class JenaTBoxMixin:
                     triples.append(f"<{prop_uri}> <{RDF.type}> <{char_map[char]}> .")
         
         upd = "INSERT DATA { " + " ".join(triples) + " }"
-        return self.base._update(upd)
+        return self._update(upd)
     
     def delete_datatype_property(self, prop_uri: str) -> bool:
         """删除数据属性"""
         upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
-        return self.base._update(upd)
+        return self._update(upd)
     
     # ==================== 对象属性 ====================
     
@@ -257,7 +257,7 @@ class JenaTBoxMixin:
             OPTIONAL {{ ?prop rdfs:range ?range }}
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         
         props = []
         for row in results:
@@ -312,12 +312,12 @@ class JenaTBoxMixin:
             triples.append(f"<{prop_uri}> <{OWL.inverseOf}> <{inverse_of}> .")
         
         upd = "INSERT DATA { " + " ".join(triples) + " }"
-        return self.base._update(upd)
+        return self._update(upd)
     
     def delete_object_property(self, prop_uri: str) -> bool:
         """删除对象属性"""
         upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
-        return self.base._update(upd)
+        return self._update(upd)
     
     # ==================== 注解属性 ====================
     
@@ -334,7 +334,7 @@ class JenaTBoxMixin:
             OPTIONAL {{ ?prop rdfs:label ?label }}
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         
         props = []
         for row in results:
@@ -350,38 +350,38 @@ class JenaTBoxMixin:
     def delete_annotation_property(self, prop_uri: str) -> bool:
         """删除注解属性"""
         upd = f"DELETE WHERE {{ <{prop_uri}> ?p ?o }}"
-        return self.base._update(upd)
+        return self._update(upd)
     
     # ==================== 辅助方法 ====================
     
     def _get_label(self, uri: str) -> Optional[str]:
         q = f"PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?label WHERE {{ <{uri}> rdfs:label ?label }} LIMIT 1"
-        results = self.base._query(q)
+        results = self._query(q)
         return results[0].get("label", {}).get("value") if results else None
     
     def _get_comment(self, uri: str) -> Optional[str]:
         q = f"PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?comment WHERE {{ <{uri}> rdfs:comment ?comment }} LIMIT 1"
-        results = self.base._query(q)
+        results = self._query(q)
         return results[0].get("comment", {}).get("value") if results else None
     
     def _get_super_classes(self, class_uri: str) -> list[str]:
         q = f"PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT ?super WHERE {{ <{class_uri}> rdfs:subClassOf ?super }}"
-        results = self.base._query(q)
+        results = self._query(q)
         return [self._local_name(row.get("super", {}).get("value", "")) for row in results]
     
     def _get_equivalent_classes(self, class_uri: str) -> list[str]:
         q = f"PREFIX owl: <http://www.w3.org/2002/07/owl#> SELECT ?eq WHERE {{ <{class_uri}> owl:equivalentClass ?eq }}"
-        results = self.base._query(q)
+        results = self._query(q)
         return [self._local_name(row.get("eq", {}).get("value", "")) for row in results]
     
     def _get_disjoint_classes(self, class_uri: str) -> list[str]:
         q = f"PREFIX owl: <http://www.w3.org/2002/07/owl#> SELECT ?disjoint WHERE {{ <{class_uri}> owl:disjointWith ?disjoint }}"
-        results = self.base._query(q)
+        results = self._query(q)
         return [self._local_name(row.get("disjoint", {}).get("value", "")) for row in results]
     
     def _get_property_characteristics(self, prop_uri: str) -> list[str]:
         q = f"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> SELECT ?type WHERE {{ <{prop_uri}> rdf:type ?type }}"
-        results = self.base._query(q)
+        results = self._query(q)
         
         char_map = {
             "FunctionalProperty": "functional",

@@ -66,7 +66,7 @@ class JenaABoxMixin:
             {filter_str}
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         
         individuals = []
         for row in results:
@@ -136,12 +136,12 @@ class JenaABoxMixin:
                 triples.append(f"<{individual_uri}> <{prop_uri}> <{target_uri}> .")
         
         upd = "INSERT DATA { " + " ".join(triples) + " }"
-        return self.base._update(upd)
+        return self._update(upd)
     
     def delete_individual(self, individual_uri: str) -> bool:
         """删除 Individual"""
         upd = f"DELETE WHERE {{ <{individual_uri}> ?p ?o }}"
-        return self.base._update(upd)
+        return self._update(upd)
     
     # ==================== 属性断言 ====================
     
@@ -154,7 +154,7 @@ class JenaABoxMixin:
             FILTER(IsLiteral(?value))
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         props = []
         for row in results:
             prop_uri = row.get("prop", {}).get("value", "")
@@ -173,7 +173,7 @@ class JenaABoxMixin:
             FILTER(IsIRI(?target))
         }}
         """
-        results = self.base._query(q)
+        results = self._query(q)
         props = []
         for row in results:
             prop_uri = row.get("prop", {}).get("value", "")
@@ -189,7 +189,7 @@ class JenaABoxMixin:
     def _get_individual_types(self, ind_uri: str) -> list[str]:
         """获取 Individual 的类型"""
         q = f"PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> SELECT ?type WHERE {{ <{ind_uri}> rdf:type ?type }}"
-        results = self.base._query(q)
+        results = self._query(q)
         return [
             self._local_name(row.get("type", {}).get("value", ""))
             for row in results

@@ -28,7 +28,6 @@ from src.schemas.ontology import (
 )
 from src.services.jena import (
     get_jena_client,
-    get_jena_client_for_dataset,
     JenaClient,
 )
 from src.services.ontology_metadata import get_metadata_store, OntologyMetadata
@@ -168,7 +167,7 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
     jena = None
     if dataset:
         try:
-            jena = get_jena_client_for_dataset(dataset)
+            jena = get_jena_client(dataset)
         except Exception:
             pass
 
@@ -248,7 +247,7 @@ async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
     if not base_iri or not dataset:
         return []
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.list_classes(base_iri)
     except Exception:
         return []
@@ -260,7 +259,7 @@ async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
     if not base_iri or not dataset:
         return []
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.list_datatype_properties(base_iri)
     except Exception:
         return []
@@ -272,7 +271,7 @@ async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse
     if not base_iri or not dataset:
         return []
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.list_object_properties(base_iri)
     except Exception:
         return []
@@ -284,7 +283,7 @@ async def get_annotation_properties(ontology_id: str) -> list:
     if not base_iri or not dataset:
         return []
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.list_annotation_properties(base_iri)
     except Exception:
         return []
@@ -298,7 +297,7 @@ async def get_individuals(
     if not base_iri or not dataset:
         return []
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.list_individuals(base_iri, class_id=class_id, search=search)
     except Exception as e:
         logger.warning(f"get_individuals failed: {e}")
@@ -343,7 +342,7 @@ async def create_ontology(
     try:
         jena = get_jena_client()
         jena.create_dataset(dataset)
-        ds_jena = get_jena_client_for_dataset(dataset)
+        ds_jena = get_jena_client(dataset)
         ds_jena.create_ontology(name=name, base_iri=base_iri, description=description)
     except Exception as e:
         logger.error(f"create ontology failed: {e}")
@@ -430,7 +429,7 @@ async def create_ontology_class(
     # 1. Jena 写入
     jena_result = None
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena_result = jena.create_class(
             ontology_iri=base_iri,
             name=name,
@@ -480,7 +479,7 @@ async def update_ontology_class(
 
     # Jena 更新
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena.update_class(class_uri, display_name=display_name, description=description)
     except Exception as e:
         logger.error(f"update class failed: {e}")
@@ -505,7 +504,7 @@ async def update_ontology_class(
 
     # 重新从 Jena 读取最新数据
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         return jena.get_class(class_uri)
     except Exception:
         return None
@@ -521,7 +520,7 @@ async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
 
     # 1. Jena 删除
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena.delete_class(class_uri)
     except Exception as e:
         logger.error(f"delete class failed: {e}")
@@ -552,7 +551,7 @@ async def create_data_property(
 
     jena_result = None
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena_result = jena.create_datatype_property(
             ontology_iri=base_iri,
             name=name,
@@ -600,7 +599,7 @@ async def update_data_property(
         return None
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
         jena.delete_datatype_property(f"{base_iri}{prop_id}")
         jena.create_datatype_property(
@@ -629,7 +628,7 @@ async def update_data_property(
             await session.commit()
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         props = jena.list_datatype_properties(base_iri)
         for p in props:
             if p.id == prop_id:
@@ -646,7 +645,7 @@ async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
         return False
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena.delete_datatype_property(f"{base_iri}{prop_id}")
     except Exception as e:
         logger.error(f"delete dataprop failed: {e}")
@@ -679,7 +678,7 @@ async def create_object_property(
 
     jena_result = None
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena_result = jena.create_object_property(
             ontology_iri=base_iri,
             name=name,
@@ -732,7 +731,7 @@ async def update_object_property(
         return None
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena.delete_object_property(f"{base_iri}{prop_id}")
         jena.create_object_property(
             ontology_iri=base_iri,
@@ -760,7 +759,7 @@ async def update_object_property(
             await session.commit()
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         props = jena.list_object_properties(base_iri)
         for p in props:
             if p.id == prop_id:
@@ -777,7 +776,7 @@ async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
         return False
 
     try:
-        jena = get_jena_client_for_dataset(dataset)
+        jena = get_jena_client(dataset)
         jena.delete_object_property(f"{base_iri}{prop_id}")
     except Exception as e:
         logger.error(f"delete objprop failed: {e}")

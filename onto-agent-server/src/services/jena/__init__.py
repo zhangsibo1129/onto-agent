@@ -51,13 +51,7 @@ def get_jena_client(dataset: str = "/onto-agent") -> JenaClient:
     return _jena_clients[dataset]
 
 
-# 向后兼容别名
-get_jena_client_for_dataset = get_jena_client
-get_jena_client_for_default_dataset = get_jena_client
-
-
 __all__ = [
-    # 新模块
     "JenaClient",
     "JenaBaseClient",
     "JenaTBoxMixin",
@@ -66,7 +60,4 @@ __all__ = [
     "get_jena_client",
     "get_fuseki_settings",
     "DEFAULT_DATASET",
-    # 向后兼容别名
-    "get_jena_client_for_dataset",
-    "get_jena_client_for_default_dataset",
 ]

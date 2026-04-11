@@ -26,7 +26,7 @@ from src.schemas.ontology import (
     AxiomResponse,
     DataRangeResponse,
 )
-from src.services.jena_client import (
+from src.services.jena import (
     get_jena_client,
     get_jena_client_for_dataset,
     JenaClient,

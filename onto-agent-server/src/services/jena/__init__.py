@@ -48,6 +48,10 @@ def get_jena_client(dataset: str = "/onto-agent") -> JenaClient:
     return _jena_clients[dataset]
 
 
+# 向后兼容别名
+get_jena_client_for_dataset = get_jena_client
+
+
 # 为了向后兼容，也导出旧的导入路径
 from src.services.jena_client import (
     JenaClient as OriginalJenaClient,

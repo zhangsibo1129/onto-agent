@@ -39,7 +39,7 @@ async def create_class(ontology_id: str, data: OntologyClassCreate):
         name=data.name,
         display_name=data.display_name,
         description=data.description,
-        super_class_names=data.super_class_names,
+        super_classes=data.super_classes,
     )
     return success_response(result)
 
@@ -52,7 +52,7 @@ async def update_class(ontology_id: str, class_id: str, data: OntologyClassCreat
         class_id=class_id,
         display_name=data.display_name,
         description=data.description,
-        super_class_names=data.super_class_names,
+        super_classes=data.super_classes,
     )
     return success_response(result)
 

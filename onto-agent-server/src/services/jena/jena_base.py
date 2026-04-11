@@ -47,7 +47,7 @@ def get_fuseki_settings() -> dict:
     return {
         "fuseki_url": getenv("FUSEKI_URL", f"http://{JENA_DEFAULT_HOST}:{JENA_DEFAULT_PORT}"),
         "username": getenv("FUSEKI_USER", "admin"),
-        "password": getenv("FUSEKI_PASSWORD", ""),
+        "password": getenv("FUSEKI_PASSWORD", "admin"),
     }
 
 
@@ -72,7 +72,7 @@ class JenaBaseClient:
         
         # SPARQL 端点
         self.query_endpoint = f"{self.fuseki_url}/{self.dataset}/sparql"
-        self.update_endpoint = f"{self.fuseki_url}/{self.dataset}/sparql"
+        self.update_endpoint = f"{self.fuseki_url}/{self.dataset}/update"
     
     def _get_auth(self):
         settings = get_fuseki_settings()
@@ -106,12 +106,11 @@ class JenaBaseClient:
     def _update(self, sparql: str) -> bool:
         """执行 SPARQL Update（INSERT/DELETE）"""
         try:
-            sw = SPARQLWrapper2(self.update_endpoint)
-            sw.setQuery(sparql)
-            sw.method = "POST"
-            
-            sw.query()
-            return True
+            # 使用 httpx 直接发送更新请求，因为 SPARQLWrapper 对更新操作支持不好
+            url = f"{self.fuseki_url}/{self.dataset}/update"
+            data = {"update": sparql}
+            r = httpx.post(url, data=data, auth=self.auth, timeout=self.timeout)
+            return r.status_code == 200
         except Exception as e:
             logger.error(f"SPARQL update failed: {e}")
             return False

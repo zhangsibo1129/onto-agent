@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from src.services.jena.jena_base import JenaBaseClient
 
+import httpx
 from rdflib import RDF, RDFS, OWL
 
 from src.logging_config import get_logger
@@ -25,6 +26,46 @@ class JenaNamedGraphMixin:
     """Named Graph 操作 Mixin"""
     
     base: "JenaBaseClient"
+    
+    # ==================== Dataset 操作 ====================
+    
+    def create_dataset(self, dataset: str) -> bool:
+        """
+        创建或确认 Dataset 存在 (使用 Fuseki 管理 API)
+        
+        Args:
+            dataset: Dataset 名称，如 "/onto-agent"
+        
+        Returns:
+            bool: 是否成功
+        """
+        import json
+        dataset_name = dataset.lstrip("/")  # 如 "onto-agent"
+        url = f"{self.fuseki_url}/$/datasets"
+        data = {
+            "dbName": dataset_name,
+            "dbType": "tdb",
+        }
+        try:
+            response = httpx.put(
+                url,
+                json=data,
+                auth=self.auth,
+                timeout=10.0,
+            )
+            if response.status_code in (200, 201, 204):
+                logger.info(f"Dataset {dataset} created/verified")
+                return True
+            elif response.status_code == 409:
+                # 已存在
+                logger.info(f"Dataset {dataset} already exists")
+                return True
+            else:
+                logger.warning(f"create_dataset failed: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.warning(f"create_dataset error: {e}")
+            return False
     
     # ==================== Named Graph 基础方法 ====================
     

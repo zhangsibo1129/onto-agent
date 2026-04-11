@@ -97,6 +97,7 @@ class JenaABoxMixin:
         display_name: str = None,
         data_property_assertions: list[dict] = None,
         object_property_assertions: list[dict] = None,
+        abox_graph_uri: str = None,
     ) -> bool:
         """
         创建 Individual
@@ -107,6 +108,7 @@ class JenaABoxMixin:
             display_name: 显示名称
             data_property_assertions: [{"propertyUri": "...", "value": "..."}]
             object_property_assertions: [{"propertyUri": "...", "targetUri": "..."}]
+            abox_graph_uri: ABox 命名图 URI
         """
         triples = [
             f"<{individual_uri}> <{RDF.type}> <http://www.w3.org/2002/07/owl#NamedIndividual> .",
@@ -125,7 +127,6 @@ class JenaABoxMixin:
             for assertion in data_property_assertions:
                 prop_uri = assertion.get("propertyUri", "")
                 value = assertion.get("value", "")
-                # 注意：这里应该根据数据类型处理 literal
                 triples.append(f'<{individual_uri}> <{prop_uri}> "{value}" .')
         
         # 添加对象属性断言
@@ -135,7 +136,11 @@ class JenaABoxMixin:
                 target_uri = assertion.get("targetUri", "")
                 triples.append(f"<{individual_uri}> <{prop_uri}> <{target_uri}> .")
         
-        upd = "INSERT DATA { " + " ".join(triples) + " }"
+        triples_str = " ".join(triples)
+        if abox_graph_uri:
+            upd = f"INSERT DATA {{ GRAPH <{abox_graph_uri}> {{ {triples_str} }} }}"
+        else:
+            upd = f"INSERT DATA {{ {triples_str} }}"
         return self._update(upd)
     
     def delete_individual(self, individual_uri: str) -> bool:

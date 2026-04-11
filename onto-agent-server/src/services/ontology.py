@@ -243,19 +243,19 @@ async def get_ontology_detail(ontology_id: str) -> Optional[OntologyDetailRespon
 
 async def get_ontology_classes(ontology_id: str) -> list[OntologyClassResponse]:
     """类列表：从 Jena 读取"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
         jena = get_jena_client(dataset)
-        return jena.list_classes(base_iri)
+        return jena.list_classes(base_iri, tbox_graph_uri=tbox_graph_uri)
     except Exception:
         return []
 
 
 async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
     """DataProperty 列表：从 Jena 读取"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
@@ -267,7 +267,7 @@ async def get_data_properties(ontology_id: str) -> list[DataPropertyResponse]:
 
 async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse]:
     """ObjectProperty 列表：从 Jena 读取"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
@@ -279,7 +279,7 @@ async def get_object_properties(ontology_id: str) -> list[ObjectPropertyResponse
 
 async def get_annotation_properties(ontology_id: str) -> list:
     """AnnotationProperty 列表：从 Jena 读取"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
@@ -293,7 +293,7 @@ async def get_individuals(
     ontology_id: str, class_id: str = None, search: str = None
 ) -> list:
     """Individual 列表：从 Jena 读取"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri or not dataset:
         return []
     try:
@@ -338,12 +338,17 @@ async def create_ontology(
     abox_graph_uri = f"{dataset}/{new_id}/abox"
     now = datetime.utcnow().isoformat() + "Z"
 
-    # 1. Jena：创建 dataset + 本体头
+    # 1. Jena：创建 dataset + 本体头（写入 TBox 命名图）
     try:
         jena = get_jena_client()
         jena.create_dataset(dataset)
         ds_jena = get_jena_client(dataset)
-        ds_jena.create_ontology(name=name, base_iri=base_iri, description=description)
+        ds_jena.create_ontology(
+            name=name, 
+            base_iri=base_iri, 
+            description=description,
+            tbox_graph_uri=tbox_graph_uri,  # 写入 TBox 命名图
+        )
     except Exception as e:
         logger.error(f"create ontology failed: {e}")
 
@@ -419,29 +424,29 @@ async def create_ontology_class(
     super_classes: list = None,
 ) -> OntologyClassResponse:
     """创建类：Jena → PostgreSQL 索引"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     class_uri = f"{base_iri}{name}"
     super_iris = [f"{base_iri}{sc}" for sc in (super_classes or [])]
 
-    # 1. Jena 写入
+    # 1. Jena 写入 TBox 命名图
     jena_result = None
     try:
         jena = get_jena_client(dataset)
         jena_result = jena.create_class(
-            ontology_iri=base_iri,
-            name=name,
+            class_uri=class_uri,
             display_name=display_name,
             description=description,
-            super_classes=super_iris if super_iris else None,
+            super_class_uris=super_iris if super_iris else None,
+            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"create class failed: {e}")
 
     # 2. PostgreSQL 索引
-    await _index_entity(ontology_id, "CLASS", name, display_name, class_uri)
+    await _index_entity(ontology_id, "CLASS", name, display_name, class_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "class_count")
 
     return jena_result or OntologyClassResponse(
@@ -471,7 +476,7 @@ async def update_ontology_class(
     super_classes: list = None,
 ) -> Optional[OntologyClassResponse]:
     """更新类：Jena → PostgreSQL 索引（名称变化时）"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return None
 
@@ -512,7 +517,7 @@ async def update_ontology_class(
 
 async def delete_ontology_class(ontology_id: str, class_id: str) -> bool:
     """删除类：Jena + PostgreSQL 索引"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return False
 
@@ -543,28 +548,29 @@ async def create_data_property(
     super_property_id: str = None,
 ) -> DataPropertyResponse:
     """创建 DataProperty：Jena → PostgreSQL 索引"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
+    prop_uri = f"{base_iri}{name}"
 
     jena_result = None
     try:
         jena = get_jena_client(dataset)
         jena_result = jena.create_datatype_property(
-            ontology_iri=base_iri,
-            name=name,
-            domain_iri=domain_iri,
+            prop_uri=prop_uri,
+            domain_uri=domain_iri,
             range_type=range_type,
             display_name=display_name,
             characteristics=characteristics,
+            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"create dataprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
-    await _index_entity(ontology_id, "DP", name, display_name, prop_uri)
+    await _index_entity(ontology_id, "DP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "dp_count")
 
     return jena_result or DataPropertyResponse(
@@ -594,21 +600,24 @@ async def update_data_property(
     super_property_id: str = None,
 ) -> Optional[DataPropertyResponse]:
     """更新 DataProperty（暂只支持 display_name/description）"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return None
+
+    prop_uri = f"{base_iri}{prop_id}"
+    domain_uri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
 
     try:
         jena = get_jena_client(dataset)
         # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
-        jena.delete_datatype_property(f"{base_iri}{prop_id}")
+        jena.delete_datatype_property(prop_uri)
         jena.create_datatype_property(
-            ontology_iri=base_iri,
-            name=prop_id,
-            domain_iri=f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri,
+            prop_uri=prop_uri,
+            domain_uri=domain_uri,
             range_type=range_type or "string",
             display_name=display_name,
             characteristics=characteristics,
+            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"update dataprop failed: {e}")
@@ -640,7 +649,7 @@ async def update_data_property(
 
 async def delete_data_property(ontology_id: str, prop_id: str) -> bool:
     """删除 DataProperty：Jena + PostgreSQL"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return False
 
@@ -668,31 +677,32 @@ async def create_object_property(
     property_chain: list = None,
 ) -> ObjectPropertyResponse:
     """创建 ObjectProperty：Jena → PostgreSQL 索引"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     domain_iri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
     range_iri = f"{base_iri}{range_ids[0]}" if range_ids else base_iri
     inverse_of = f"{base_iri}{inverse_of_id}" if inverse_of_id else None
+    prop_uri = f"{base_iri}{name}"
 
     jena_result = None
     try:
         jena = get_jena_client(dataset)
         jena_result = jena.create_object_property(
-            ontology_iri=base_iri,
-            name=name,
-            domain_iri=domain_iri,
-            range_iri=range_iri,
+            prop_uri=prop_uri,
+            domain_uri=domain_iri,
+            range_uri=range_iri,
             display_name=display_name,
             characteristics=characteristics,
             inverse_of=inverse_of,
+            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"create objprop failed: {e}")
 
     prop_uri = f"{base_iri}{name}"
-    await _index_entity(ontology_id, "OP", name, display_name, prop_uri)
+    await _index_entity(ontology_id, "OP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "op_count")
 
     return jena_result or ObjectPropertyResponse(
@@ -726,21 +736,26 @@ async def update_object_property(
     property_chain: list = None,
 ) -> Optional[ObjectPropertyResponse]:
     """更新 ObjectProperty（简化：delete + recreate）"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, tbox_graph_uri, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return None
 
+    prop_uri = f"{base_iri}{prop_id}"
+    domain_uri = f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri
+    range_uri = f"{base_iri}{range_ids[0]}" if range_ids else base_iri
+    inverse_of = f"{base_iri}{inverse_of_id}" if inverse_of_id else None
+
     try:
         jena = get_jena_client(dataset)
-        jena.delete_object_property(f"{base_iri}{prop_id}")
+        jena.delete_object_property(prop_uri)
         jena.create_object_property(
-            ontology_iri=base_iri,
-            name=prop_id,
-            domain_iri=f"{base_iri}{domain_ids[0]}" if domain_ids else base_iri,
-            range_iri=f"{base_iri}{range_ids[0]}" if range_ids else base_iri,
+            prop_uri=prop_uri,
+            domain_uri=domain_uri,
+            range_uri=range_uri,
             display_name=display_name,
             characteristics=characteristics,
-            inverse_of=f"{base_iri}{inverse_of_id}" if inverse_of_id else None,
+            inverse_of=inverse_of,
+            tbox_graph_uri=tbox_graph_uri,
         )
     except Exception as e:
         logger.error(f"update objprop failed: {e}")
@@ -771,7 +786,7 @@ async def update_object_property(
 
 async def delete_object_property(ontology_id: str, prop_id: str) -> bool:
     """删除 ObjectProperty：Jena + PostgreSQL"""
-    base_iri, dataset = await _get_ontology_iri(ontology_id)
+    base_iri, dataset, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         return False
 
@@ -796,12 +811,12 @@ async def create_annotation_property(
     sub_property_of_id: str = None,
 ) -> AnnotationPropertyResponse:
     """创建 AnnotationProperty（暂不写 Jena，只更新 PostgreSQL 索引）"""
-    base_iri, _ = await _get_ontology_iri(ontology_id)
+    base_iri, _, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     prop_uri = f"{base_iri}{name}"
-    await _index_entity(ontology_id, "AP", name, display_name, prop_uri)
+    await _index_entity(ontology_id, "AP", name, display_name, prop_uri, graph_uri=tbox_graph_uri)
     await _increment_count(ontology_id, "ap_count")
 
     return AnnotationPropertyResponse(
@@ -827,13 +842,31 @@ async def create_individual(
     data_property_assertions: list = None,
     object_property_assertions: list = None,
 ) -> IndividualResponse:
-    """创建 Individual（暂只写 PostgreSQL 索引，Jena 个体写入较复杂）"""
-    base_iri, _ = await _get_ontology_iri(ontology_id)
+    """创建 Individual：Jena ABox → PostgreSQL 索引"""
+    base_iri, dataset, _, abox_graph_uri = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
     ind_uri = f"{base_iri}{name}"
-    await _index_entity(ontology_id, "INDIVIDUAL", name, display_name, ind_uri)
+    class_uris = [f"{base_iri}{t}" for t in (types or [])]
+
+    # 1. Jena 写入 ABox 命名图
+    jena_result = None
+    try:
+        jena = get_jena_client(dataset)
+        jena_result = jena.create_individual(
+            individual_uri=ind_uri,
+            class_uris=class_uris,
+            display_name=display_name,
+            data_property_assertions=data_property_assertions,
+            object_property_assertions=object_property_assertions,
+            abox_graph_uri=abox_graph_uri,
+        )
+    except Exception as e:
+        logger.error(f"create individual failed: {e}")
+
+    # 2. PostgreSQL 索引
+    await _index_entity(ontology_id, "INDIVIDUAL", name, display_name, ind_uri, graph_uri=abox_graph_uri)
     await _increment_count(ontology_id, "individual_count")
 
     return IndividualResponse(
@@ -859,7 +892,7 @@ async def create_axiom(
 ) -> AxiomResponse:
     """创建 Axiom（暂只写 PostgreSQL 索引）"""
     import uuid
-    base_iri, _ = await _get_ontology_iri(ontology_id)
+    base_iri, _, _, _ = await _get_ontology_iri(ontology_id)
     if not base_iri:
         raise ValueError(f"Ontology {ontology_id} not found")
 
@@ -880,16 +913,16 @@ async def create_axiom(
 # 内部辅助函数
 # ============================================================================
 
-async def _get_ontology_iri(ontology_id: str) -> tuple[Optional[str], Optional[str]]:
-    """从 PostgreSQL 获取本体的 base_iri 和 dataset"""
+async def _get_ontology_iri(ontology_id: str) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """从 PostgreSQL 获取本体的 base_iri, dataset, tbox_graph_uri, abox_graph_uri"""
     async with SystemSession() as session:
         result = await session.execute(
-            select(Ontology.base_iri, Ontology.dataset).where(Ontology.id == ontology_id)
+            select(Ontology.base_iri, Ontology.dataset, Ontology.tbox_graph_uri, Ontology.abox_graph_uri).where(Ontology.id == ontology_id)
         )
         row = result.one_or_none()
         if not row:
-            return None, None
-        return row[0], row[1]
+            return None, None, None, None
+        return row[0], row[1], row[2], row[3]
 
 
 async def _index_entity(
@@ -898,6 +931,7 @@ async def _index_entity(
     name: str,
     display_name: str = None,
     jena_uri: str = None,
+    graph_uri: str = None,
 ):
     """向 PostgreSQL entity_index 写入一条索引"""
     import uuid
@@ -908,6 +942,7 @@ async def _index_entity(
             entity_type=entity_type,
             name=name,
             display_name=display_name,
+            graph_uri=graph_uri,
             jena_uri=jena_uri,
         )
         session.add(idx)

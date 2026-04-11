@@ -34,6 +34,44 @@ class JenaTBoxMixin:
     
     # ==================== 本体操作 ====================
     
+    def create_ontology(
+        self,
+        name: str,
+        base_iri: str,
+        description: str = None,
+        tbox_graph_uri: str = None,
+    ) -> bool:
+        """
+        创建本体
+        
+        Args:
+            name: 本体名称
+            base_iri: 本体 IRI
+            description: 描述
+            tbox_graph_uri: TBox 命名图 URI（可选，默认写入默认图）
+        
+        Returns:
+            bool: 是否成功
+        """
+        triples = [
+            f"<{base_iri}> <{RDF.type}> <{OWL.Ontology}> .",
+        ]
+        if name:
+            triples.append(f'<{base_iri}> <{RDFS.label}> "{name}" .')
+        if description:
+            triples.append(f'<{base_iri}> <{RDFS.comment}> "{description}" .')
+        
+        triples_str = " ".join(triples)
+        
+        if tbox_graph_uri:
+            # 写入指定的 TBox 命名图
+            upd = f"INSERT DATA {{ GRAPH <{tbox_graph_uri}> {{ {triples_str} }} }}"
+        else:
+            # 写入默认图
+            upd = f"INSERT DATA {{ {triples_str} }}"
+        
+        return self._update(upd)
+    
     def list_ontologies(self) -> list[dict]:
         """列出所有本体（从 Jena 中查询）"""
         q = """
@@ -81,20 +119,36 @@ class JenaTBoxMixin:
     
     # ==================== 类操作 ====================
     
-    def list_classes(self, ontology_iri: str) -> list[OntologyClassResponse]:
+    def list_classes(self, ontology_iri: str, tbox_graph_uri: str = None) -> list[OntologyClassResponse]:
         """列出本体所有类"""
-        q = f"""
-        PREFIX owl: <http://www.w3.org/2002/07/owl#>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        
-        SELECT DISTINCT ?class ?label ?comment
-        WHERE {{
-            ?class a owl:Class .
-            FILTER(STRSTARTS(STR(?class), "{ontology_iri}"))
-            OPTIONAL {{ ?class rdfs:label ?label }}
-            OPTIONAL {{ ?class rdfs:comment ?comment }}
-        }}
-        """
+        if tbox_graph_uri:
+            q = f"""
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT DISTINCT ?class ?label ?comment
+            WHERE {{
+                GRAPH <{tbox_graph_uri}> {{
+                    ?class a owl:Class .
+                    FILTER(STRSTARTS(STR(?class), "{ontology_iri}"))
+                    OPTIONAL {{ ?class rdfs:label ?label }}
+                    OPTIONAL {{ ?class rdfs:comment ?comment }}
+                }}
+            }}
+            """
+        else:
+            q = f"""
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT DISTINCT ?class ?label ?comment
+            WHERE {{
+                ?class a owl:Class .
+                FILTER(STRSTARTS(STR(?class), "{ontology_iri}"))
+                OPTIONAL {{ ?class rdfs:label ?label }}
+                OPTIONAL {{ ?class rdfs:comment ?comment }}
+            }}
+            """
         results = self._query(q)
         
         classes = []
@@ -123,6 +177,7 @@ class JenaTBoxMixin:
         display_name: str = None,
         description: str = None,
         super_class_uris: list[str] = None,
+        tbox_graph_uri: str = None,
     ) -> bool:
         """创建 OWL 类"""
         triples = [
@@ -135,7 +190,11 @@ class JenaTBoxMixin:
             for sc_uri in super_class_uris:
                 triples.append(f"<{class_uri}> <{RDFS.subClassOf}> <{sc_uri}> .")
         
-        upd = "INSERT DATA { " + " ".join(triples) + " }"
+        triples_str = " ".join(triples)
+        if tbox_graph_uri:
+            upd = f"INSERT DATA {{ GRAPH <{tbox_graph_uri}> {{ {triples_str} }} }}"
+        else:
+            upd = f"INSERT DATA {{ {triples_str} }}"
         return self._update(upd)
     
     def update_class(
@@ -215,6 +274,7 @@ class JenaTBoxMixin:
         range_type: str = "string",
         display_name: str = None,
         characteristics: list[str] = None,
+        tbox_graph_uri: str = None,
     ) -> bool:
         """创建数据属性"""
         xsd_range = f"http://www.w3.org/2001/XMLSchema#{range_type}"
@@ -232,7 +292,11 @@ class JenaTBoxMixin:
                 if char in char_map:
                     triples.append(f"<{prop_uri}> <{RDF.type}> <{char_map[char]}> .")
         
-        upd = "INSERT DATA { " + " ".join(triples) + " }"
+        triples_str = " ".join(triples)
+        if tbox_graph_uri:
+            upd = f"INSERT DATA {{ GRAPH <{tbox_graph_uri}> {{ {triples_str} }} }}"
+        else:
+            upd = f"INSERT DATA {{ {triples_str} }}"
         return self._update(upd)
     
     def delete_datatype_property(self, prop_uri: str) -> bool:
@@ -288,6 +352,7 @@ class JenaTBoxMixin:
         display_name: str = None,
         characteristics: list[str] = None,
         inverse_of: str = None,
+        tbox_graph_uri: str = None,
     ) -> bool:
         """创建对象属性"""
         triples = [
@@ -310,6 +375,13 @@ class JenaTBoxMixin:
         
         if inverse_of:
             triples.append(f"<{prop_uri}> <{OWL.inverseOf}> <{inverse_of}> .")
+        
+        triples_str = " ".join(triples)
+        if tbox_graph_uri:
+            upd = f"INSERT DATA {{ GRAPH <{tbox_graph_uri}> {{ {triples_str} }} }}"
+        else:
+            upd = f"INSERT DATA {{ {triples_str} }}"
+        return self._update(upd)
         
         upd = "INSERT DATA { " + " ".join(triples) + " }"
         return self._update(upd)

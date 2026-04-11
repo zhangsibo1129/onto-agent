@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
-from src.database import get_db
+from src.database import get_system_db as get_db
 from src.models.datasource import Datasource
 from src.schemas.datasource import (
     DatasourceCreate,

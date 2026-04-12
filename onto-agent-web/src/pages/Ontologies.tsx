@@ -39,6 +39,8 @@ export default function Ontologies() {
   const [statusFilter, setStatusFilter] = useState("全部状态")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
+  const [editingOntology, setEditingOntology] = useState<Ontology | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
 
   const [formData, setFormData] = useState<CreateOntologyDto>({
     name: "",
@@ -100,6 +102,43 @@ export default function Ontologies() {
       ...prev,
       baseIri: `http://onto-agent.com/ontology/${slug}#`,
     }))
+  }
+
+  // 打开编辑 Modal
+  const handleEditClick = (e: React.MouseEvent, ontology: Ontology) => {
+    e.stopPropagation()
+    setEditingOntology(ontology)
+    setFormData({
+      name: ontology.name,
+      description: ontology.description || "",
+      baseIri: ontology.baseIri,
+    })
+  }
+
+  // 保存编辑
+  const handleUpdateOntology = async () => {
+    if (!editingOntology || !formData.name.trim() || !formData.baseIri.trim()) {
+      alert("请填写必填项")
+      return
+    }
+
+    setEditLoading(true)
+    try {
+      const updated = await ontologyApi.updateOntology(editingOntology.id, formData)
+      setOntologies((prev) => prev.map((o) => (o.id === editingOntology.id ? updated : o)))
+      setEditingOntology(null)
+      setFormData({ name: "", description: "", baseIri: "http://onto-agent.com/ontology/" })
+    } catch (err) {
+      console.error("更新本体失败:", err)
+      alert("更新本体失败")
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleCloseEditModal = () => {
+    setEditingOntology(null)
+    setFormData({ name: "", description: "", baseIri: "http://onto-agent.com/ontology/" })
   }
 
   return (
@@ -166,7 +205,7 @@ export default function Ontologies() {
                 </div>
               </div>
               <div className="ontology-card-actions">
-                <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); alert("编辑功能开发中") }} title="编辑">✎</button>
+                <button className="btn btn-ghost btn-sm" onClick={(e) => handleEditClick(e, ontology)} title="编辑">✎</button>
                 <button className="btn btn-ghost btn-sm" onClick={(e) => handleDelete(e, ontology.id)} title="删除">✕</button>
               </div>
             </div>
@@ -239,6 +278,48 @@ export default function Ontologies() {
               自动生成
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* 编辑 Modal */}
+      <Modal
+        isOpen={!!editingOntology}
+        onClose={handleCloseEditModal}
+        title="编辑本体"
+      >
+        <div className="form-group">
+          <label className="form-label">名称 *</label>
+          <input
+            type="text"
+            className="form-input"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Base IRI *</label>
+          <input
+            type="text"
+            className="form-input"
+            value={formData.baseIri}
+            onChange={(e) => setFormData({ ...formData, baseIri: e.target.value })}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">描述</label>
+          <textarea
+            className="form-textarea"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
+        </div>
+        <div className="form-actions">
+          <Button variant="secondary" onClick={handleCloseEditModal}>
+            取消
+          </Button>
+          <Button onClick={handleUpdateOntology} disabled={editLoading}>
+            {editLoading ? "保存中..." : "保存"}
+          </Button>
         </div>
       </Modal>
     </>

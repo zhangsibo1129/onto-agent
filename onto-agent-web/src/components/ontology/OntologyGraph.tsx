@@ -146,10 +146,14 @@ function buildGraphData(data: OntologyGraphData): { nodes: GraphNode[]; links: G
   }))
 
   const links: GraphLink[] = []
+  const validNodeIds = new Set(classes.map(c => c.id))
 
   for (const op of objectProperties) {
     for (const sourceId of op.domainIds || []) {
       for (const targetId of op.rangeIds || []) {
+        // Skip if source or target node doesn't exist
+        if (!validNodeIds.has(sourceId) || !validNodeIds.has(targetId)) continue
+        
         const reverseOp = objectProperties.find(p => 
           (p.domainIds || []).includes(targetId) && (p.rangeIds || []).includes(sourceId)
         )

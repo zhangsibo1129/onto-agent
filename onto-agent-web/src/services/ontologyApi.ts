@@ -375,6 +375,40 @@ export interface VersionCompareResult {
   toContent: string
 }
 
+export interface SyncTask {
+  id: string
+  ontologyId: string
+  status: "pending" | "running" | "success" | "failed"
+  mode: string
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  processedCount?: number
+  totalCount?: number
+  error?: string
+}
+
+export interface SyncLog {
+  id: string
+  taskId: string
+  level: "info" | "warning" | "error" | "success"
+  message: string
+  createdAt: string
+}
+
+export interface Mapping {
+  propertyName: string
+  columnName: string
+  transform?: string
+  createdAt: string
+}
+
+export interface MappingCreateDto {
+  propertyName: string
+  columnName: string
+  transform?: string
+}
+
 export interface CreateVersionDto {
   version: string
   description?: string
@@ -588,4 +622,37 @@ export const ontologyApi = {
       `/ontologies/${ontologyId}/individuals/${individualId}`,
       { method: "DELETE" }
     ),
+
+  // ============================================================
+  // Sync Tasks
+  // ============================================================
+  listSyncTasks: (ontologyId: string) =>
+    request<SyncTask[]>(`/ontologies/${ontologyId}/sync/tasks`),
+
+  triggerSync: (ontologyId: string, mode: string = "full") =>
+    request<{ success: boolean; taskId: string }>(
+      `/ontologies/${ontologyId}/sync/tasks`,
+      { method: "POST", body: JSON.stringify({ mode }) }
+    ),
+
+  getSyncTask: (ontologyId: string, taskId: string) =>
+    request<SyncTask>(`/ontologies/${ontologyId}/sync/tasks/${taskId}`),
+
+  getSyncTaskLogs: (ontologyId: string, taskId: string) =>
+    request<SyncLog[]>(`/ontologies/${ontologyId}/sync/tasks/${taskId}/logs`),
+
+  deleteSyncTask: (ontologyId: string, taskId: string) =>
+    request<void>(`/ontologies/${ontologyId}/sync/tasks/${taskId}`, { method: "DELETE" }),
+
+  // ============================================================
+  // Mappings
+  // ============================================================
+  listMappings: (ontologyId: string) =>
+    request<Mapping[]>(`/ontologies/${ontologyId}/mappings`),
+
+  createMapping: (ontologyId: string, dto: Partial<MappingCreateDto>) =>
+    request<Mapping>(`/ontologies/${ontologyId}/mappings`, { method: "POST", body: JSON.stringify(dto) }),
+
+  deleteMapping: (ontologyId: string, propertyName: string) =>
+    request<void>(`/ontologies/${ontologyId}/mappings/${propertyName}`, { method: "DELETE" }),
 }

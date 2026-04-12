@@ -10,8 +10,11 @@ from fastapi import APIRouter
 from src.services import ontology as ontology_service
 from src.schemas.ontology import (
     OntologyClassCreate,
+    OntologyClassUpdate,
     DataPropertyCreate,
+    DataPropertyUpdate,
     ObjectPropertyCreate,
+    ObjectPropertyUpdate,
     AnnotationPropertyCreate,
 )
 
@@ -45,7 +48,7 @@ async def create_class(ontology_id: str, data: OntologyClassCreate):
 
 
 @router.put("/{ontology_id}/classes/{class_id}")
-async def update_class(ontology_id: str, class_id: str, data: OntologyClassCreate):
+async def update_class(ontology_id: str, class_id: str, data: OntologyClassUpdate):
     """更新类"""
     result = await ontology_service.update_ontology_class(
         ontology_id=ontology_id,
@@ -88,7 +91,7 @@ async def create_data_property(ontology_id: str, data: DataPropertyCreate):
 
 
 @router.put("/{ontology_id}/data-properties/{prop_id}")
-async def update_data_property(ontology_id: str, prop_id: str, data: DataPropertyCreate):
+async def update_data_property(ontology_id: str, prop_id: str, data: DataPropertyUpdate):
     """更新数据属性"""
     result = await ontology_service.update_data_property(
         ontology_id=ontology_id,
@@ -132,7 +135,7 @@ async def create_object_property(ontology_id: str, data: ObjectPropertyCreate):
 
 
 @router.put("/{ontology_id}/object-properties/{prop_id}")
-async def update_object_property(ontology_id: str, prop_id: str, data: ObjectPropertyCreate):
+async def update_object_property(ontology_id: str, prop_id: str, data: ObjectPropertyUpdate):
     """更新对象属性"""
     result = await ontology_service.update_object_property(
         ontology_id=ontology_id,

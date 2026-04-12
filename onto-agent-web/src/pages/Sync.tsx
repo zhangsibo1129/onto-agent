@@ -1,214 +1,293 @@
-const syncTasks = [
-  {
-    id: 1,
-    name: "客户360 - ERP-Production 同步",
-    mode: "增量同步",
-    modeType: "CDC 模式",
-    target: "客户360 v2.1",
-    progress: 65,
-    processed: 2456,
-    total: 3789,
-    status: "running",
-  },
-  {
-    id: 2,
-    name: "供应商网络 - SCM-SupplyChain 同步",
-    mode: "全量同步",
-    modeType: "每日 00:00",
-    target: "供应商网络 v1.3",
-    progress: 100,
-    processed: 12450,
-    total: 12450,
-    status: "success",
-  },
-  {
-    id: 3,
-    name: "订单全景 - ERP-Production 同步",
-    mode: "增量同步",
-    modeType: "时间戳模式",
-    target: "订单全景 v1.2",
-    progress: 100,
-    processed: 8234,
-    total: 8234,
-    status: "success",
-  },
-  {
-    id: 4,
-    name: "库存管理 - ERP-Production 同步",
-    mode: "全量同步",
-    modeType: "手动触发",
-    target: "库存管理 v0.5",
-    progress: 0,
-    processed: 0,
-    total: 0,
-    status: "error",
-    error: "连接失败",
-  },
-]
+import { useState, useEffect, useCallback } from "react"
+import { useParams } from "react-router-dom"
+import { ontologyApi, type SyncTask, type SyncLog } from "@/services/ontologyApi"
+import "./Sync.css"
 
-const logs = [
-  { time: "14:32:15", level: "info", message: "客户360同步任务已启动" },
-  { time: "14:32:16", level: "info", message: "连接数据源 CRM-Main..." },
-  { time: "14:32:17", level: "success", message: "连接成功，开始读取变更数据" },
-  { time: "14:32:18", level: "info", message: "读取到 456 条新增记录" },
-  { time: "14:32:19", level: "info", message: "读取到 1,234 条更新记录" },
-  { time: "14:32:20", level: "warning", message: "检测到 3 条数据冲突，已标记待处理" },
-  { time: "14:32:21", level: "info", message: "正在写入本体图数据库..." },
-  { time: "14:32:25", level: "success", message: "同步完成，成功写入 2,456 条" },
-  { time: "13:15:00", level: "info", message: "供应商网络同步任务已启动" },
-  { time: "13:15:30", level: "success", message: "全量同步完成，处理 12,450 条" },
-  { time: "12:00:00", level: "error", message: "库存管理同步失败: 连接超时" },
-]
+const STATUS_LABELS: Record<string, { text: string; color: string }> = {
+  pending: { text: "等待中", color: "var(--status-warning)" },
+  running: { text: "运行中", color: "var(--brand-primary)" },
+  success: { text: "成功", color: "var(--status-success)" },
+  failed: { text: "失败", color: "var(--status-error)" },
+}
+
+const LEVEL_COLORS: Record<string, string> = {
+  info: "var(--brand-primary)",
+  warning: "var(--status-warning)",
+  error: "var(--status-error)",
+  success: "var(--status-success)",
+}
 
 export default function Sync() {
+  const { id: ontologyId } = useParams<{ id: string }>()
+  
+  const [tasks, setTasks] = useState<SyncTask[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedTask, setSelectedTask] = useState<SyncTask | null>(null)
+  const [logs, setLogs] = useState<SyncLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // 加载任务列表
+  const fetchTasks = useCallback(async () => {
+    if (!ontologyId) return
+    setLoading(true)
+    try {
+      const data = await ontologyApi.listSyncTasks(ontologyId)
+      setTasks(data)
+    } catch (err) {
+      console.error("加载同步任务失败:", err)
+    } finally {
+      setLoading(false)
+    }
+  }, [ontologyId])
+
+  useEffect(() => {
+    fetchTasks()
+  }, [fetchTasks])
+
+  // 加载日志
+  const fetchLogs = useCallback(async (taskId: string) => {
+    if (!ontologyId) return
+    setLogsLoading(true)
+    try {
+      const data = await ontologyApi.getSyncTaskLogs(ontologyId, taskId)
+      setLogs(data)
+    } catch (err) {
+      console.error("加载日志失败:", err)
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [ontologyId])
+
+  // 选择任务时加载日志
+  useEffect(() => {
+    if (selectedTask) {
+      fetchLogs(selectedTask.id)
+    } else {
+      setLogs([])
+    }
+  }, [selectedTask, fetchLogs])
+
+  // 触发同步
+  const handleTriggerSync = async (mode: string) => {
+    if (!ontologyId) return
+    try {
+      const result = await ontologyApi.triggerSync(ontologyId, mode)
+      if (result.success) {
+        fetchTasks()
+        setShowCreateModal(false)
+      }
+    } catch (err) {
+      console.error("触发同步失败:", err)
+    }
+  }
+
+  // 删除任务
+  const handleDelete = async (taskId: string) => {
+    if (!ontologyId) return
+    if (!confirm("确定要删除这个同步任务吗？")) return
+    try {
+      await ontologyApi.deleteSyncTask(ontologyId, taskId)
+      if (selectedTask?.id === taskId) {
+        setSelectedTask(null)
+      }
+      fetchTasks()
+    } catch (err) {
+      console.error("删除任务失败:", err)
+    }
+  }
+
+  // 统计
+  const runningCount = tasks.filter(t => t.status === "running").length
+  const successCount = tasks.filter(t => t.status === "success").length
+  const failedCount = tasks.filter(t => t.status === "failed").length
+
+  if (loading) {
+    return <div className="sync-page"><div className="loading">加载中...</div></div>
+  }
+
   return (
-    <>
+    <div className="sync-page">
+      {/* 顶部统计 */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">同步任务</div>
-          <div className="stat-value">4</div>
+          <div className="stat-value">{tasks.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">运行中</div>
-          <div className="stat-value" style={{ color: "var(--brand-primary)" }}>1</div>
+          <div className="stat-value" style={{ color: "var(--brand-primary)" }}>{runningCount}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">今日同步</div>
-          <div className="stat-value">12,847</div>
-          <div className="stat-change positive">条记录</div>
+          <div className="stat-value">
+            {tasks.reduce((sum, t) => sum + (t.processedCount || 0), 0).toLocaleString()}
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">最后同步</div>
-          <div className="stat-value text-sm">5 分钟前</div>
+          <div className="stat-label">失败</div>
+          <div className="stat-value" style={{ color: failedCount > 0 ? "var(--status-error)" : "inherit" }}>
+            {failedCount}
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "var(--space-4)" }}>
-        <div className="sync-card">
-          <div className="sync-card-header">
-            <span className="card-title">同步任务</span>
-            <button className="btn btn-ghost btn-sm">显示全部</button>
+      <div className="sync-layout">
+        {/* 左侧：任务列表 */}
+        <div className="sync-list">
+          <div className="sync-list-header">
+            <h3>同步任务</h3>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowCreateModal(true)}>
+              + 新建同步
+            </button>
           </div>
-          <div className="sync-card-body">
-            <div className="sync-legend">
-              <div className="sync-legend-item">
-                <span className="sync-legend-dot" style={{ background: "var(--brand-primary)" }}></span>
-                <span>运行中</span>
-              </div>
-              <div className="sync-legend-item">
-                <span className="sync-legend-dot" style={{ background: "var(--status-success)" }}></span>
-                <span>成功</span>
-              </div>
-              <div className="sync-legend-item">
-                <span className="sync-legend-dot" style={{ background: "var(--status-error)" }}></span>
-                <span>失败</span>
-              </div>
+          
+          {tasks.length === 0 ? (
+            <div className="empty-state">
+              <p>暂无同步任务</p>
+              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+                创建第一个任务
+              </button>
             </div>
-            {syncTasks.map((task) => (
-              <div key={task.id} className="sync-item">
+          ) : (
+            <div className="task-list">
+              {tasks.map(task => (
                 <div
-                  className="sync-icon"
-                  style={{
-                    background:
-                      task.status === "running"
-                        ? "rgba(59, 130, 246, 0.1)"
-                        : task.status === "success"
-                        ? "rgba(16, 185, 129, 0.1)"
-                        : "rgba(239, 68, 68, 0.1)",
-                    color:
-                      task.status === "running"
-                        ? "var(--brand-primary)"
-                        : task.status === "success"
-                        ? "var(--status-success)"
-                        : "var(--status-error)",
-                  }}
+                  key={task.id}
+                  className={`task-card ${selectedTask?.id === task.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedTask(task)}
                 >
-                  {task.status === "running" ? "⟳" : task.status === "success" ? "✓" : "!"}
-                </div>
-                <div className="sync-info">
-                  <div className="sync-name">{task.name}</div>
-                  <div className="sync-meta">
-                    {task.mode} · {task.modeType} · 目标: {task.target}
+                  <div className="task-status">
+                    <span 
+                      className="status-dot"
+                      style={{ background: STATUS_LABELS[task.status]?.color }}
+                    />
+                  </div>
+                  <div className="task-info">
+                    <div className="task-mode">{task.mode}</div>
+                    <div className="task-progress">
+                      {task.status === "running" && task.totalCount ? (
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill" 
+                            style={{ width: `${(task.processedCount || 0) / task.totalCount * 100}%` }}
+                          />
+                        </div>
+                      ) : task.status === "success" ? (
+                        <span className="task-count">{task.processedCount?.toLocaleString()} 条</span>
+                      ) : task.status === "failed" ? (
+                        <span className="task-error">{task.error}</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-                <div className="sync-progress">
-                  <div className="sync-progress-bar">
-                    <div
-                      className="sync-progress-fill"
-                      style={{
-                        width: `${task.progress}%`,
-                        background:
-                          task.status === "error"
-                            ? "var(--status-error)"
-                            : task.status === "success"
-                            ? "var(--status-success)"
-                            : "var(--brand-primary)",
-                      }}
-                    ></div>
-                  </div>
-                  <div className="sync-progress-text">
-                    {task.status === "running"
-                      ? `处理中 · ${task.processed.toLocaleString()} / ${task.total.toLocaleString()}`
-                      : task.status === "error"
-                      ? `错误: ${task.error}`
-                      : `已完成 · ${task.processed.toLocaleString()} 条`}
-                  </div>
-                </div>
-                <div className="sync-status">
-                  <div className={`sync-status-dot ${task.status}`}></div>
-                  <span className="text-sm text-secondary">
-                    {task.status === "running" ? "运行中" : task.status === "success" ? "成功" : "失败"}
-                  </span>
-                </div>
-                <button className="btn btn-ghost btn-sm">
-                  {task.status === "running" ? "暂停" : task.status === "error" ? "重试" : "立即同步"}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 右侧：任务详情/日志 */}
+        <div className="sync-detail">
+          {selectedTask ? (
+            <>
+              <div className="detail-header">
+                <h3>任务详情</h3>
+                <button 
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleDelete(selectedTask.id)}
+                >
+                  删除
                 </button>
               </div>
-            ))}
-
-            <div className="sync-schedule">
-              <div className="sync-schedule-item">
-                <span className="icon">⏰</span>
-                <span>下次全量同步:</span>
-                <strong>明天 00:00</strong>
+              
+              <div className="detail-info">
+                <div className="detail-row">
+                  <span className="detail-label">状态</span>
+                  <span className="detail-value" style={{ color: STATUS_LABELS[selectedTask.status]?.color }}>
+                    {STATUS_LABELS[selectedTask.status]?.text}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">模式</span>
+                  <span className="detail-value">{selectedTask.mode}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">创建时间</span>
+                  <span className="detail-value">{selectedTask.createdAt}</span>
+                </div>
+                {selectedTask.startedAt && (
+                  <div className="detail-row">
+                    <span className="detail-label">开始时间</span>
+                    <span className="detail-value">{selectedTask.startedAt}</span>
+                  </div>
+                )}
+                {selectedTask.completedAt && (
+                  <div className="detail-row">
+                    <span className="detail-label">完成时间</span>
+                    <span className="detail-value">{selectedTask.completedAt}</span>
+                  </div>
+                )}
               </div>
-              <div className="sync-schedule-item">
-                <span className="icon">📊</span>
-                <span>本周已同步:</span>
-                <strong>156,789 条</strong>
+
+              <div className="logs-section">
+                <h4>执行日志</h4>
+                {logsLoading ? (
+                  <div className="loading">加载日志...</div>
+                ) : logs.length === 0 ? (
+                  <div className="empty-logs">暂无日志</div>
+                ) : (
+                  <div className="logs-list">
+                    {logs.map(log => (
+                      <div key={log.id} className="log-item">
+                        <span className="log-time">{log.createdAt.split("T")[1]?.split(".")[0]}</span>
+                        <span className="log-level" style={{ color: LEVEL_COLORS[log.level] }}>
+                          [{log.level}]
+                        </span>
+                        <span className="log-message">{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="detail-empty">
+              <p>选择一个任务查看详情</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 创建 Modal */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>新建同步任务</h3>
+              <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p className="sync-mode-label">选择同步模式：</p>
+              <div className="sync-mode-options">
+                <button 
+                  className="sync-mode-btn"
+                  onClick={() => handleTriggerSync("full")}
+                >
+                  <div className="mode-title">全量同步</div>
+                  <div className="mode-desc">重新同步所有数据</div>
+                </button>
+                <button 
+                  className="sync-mode-btn"
+                  onClick={() => handleTriggerSync("incremental")}
+                >
+                  <div className="mode-title">增量同步</div>
+                  <div className="mode-desc">仅同步新增和变更数据</div>
+                </button>
               </div>
             </div>
           </div>
         </div>
-
-        <div className="sync-card">
-          <div className="sync-card-header">
-            <span className="card-title">同步日志</span>
-            <button className="btn btn-ghost btn-sm">查看全部</button>
-          </div>
-          <div className="sync-card-body" style={{ maxHeight: 500, overflowY: "auto" }}>
-            {logs.map((log, i) => (
-              <div key={i} className="log-entry">
-                <span className="log-time">{log.time}</span>
-                <span
-                  className="log-dot"
-                  style={{
-                    background:
-                      log.level === "success"
-                        ? "var(--status-success)"
-                        : log.level === "error"
-                        ? "var(--status-error)"
-                        : log.level === "warning"
-                        ? "var(--status-warning)"
-                        : "var(--text-tertiary)",
-                  }}
-                ></span>
-                <span className="log-message">{log.message}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
+      )}
+    </div>
   )
 }

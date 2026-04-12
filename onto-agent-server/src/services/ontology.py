@@ -664,36 +664,57 @@ async def update_data_property(
         return None
 
     prop_uri = f"{base_iri}{prop_id}"
-    domain_local_name = domain_ids[0] if domain_ids else None
+    
+    # 先获取现有属性值
+    jena = get_jena_client(dataset)
+    try:
+        existing_props = jena.list_datatype_properties(base_iri)
+        existing = next((p for p in existing_props if p.id == prop_id), None)
+    except Exception as e:
+        logger.error(f"get existing dataprop failed: {e}")
+        existing = None
+    
+    # 使用新值或保留现有值
+    domain_local_name = (domain_ids[0] if domain_ids else None) or (existing.domain_ids[0] if existing and existing.domain_ids else None)
+    final_range_type = range_type or (existing.range_type if existing else None) or "string"
+    final_display_name = display_name or (existing.display_name if existing else None) or prop_id
+    final_characteristics = characteristics or (existing.characteristics if existing else [])
+
+    if not domain_local_name:
+        logger.error(f"update dataprop failed: missing domain")
+        return existing
 
     try:
-        jena = get_jena_client(dataset)
         # 重新创建（简化处理，实际应做 SPARQL DELETE/INSERT）
         jena.delete_datatype_property(prop_uri, tbox_graph=tbox_graph_uri)
         jena.create_datatype_property(
             base_iri,
             prop_id,  # prop_local_name
             domain_local_name,
-            range_type=range_type or "string",
-            display_name=display_name,
-            characteristics=characteristics,
+            range_type=final_range_type,
+            display_name=final_display_name,
+            characteristics=final_characteristics,
         )
     except Exception as e:
         logger.error(f"update dataprop failed: {e}")
+        return None
 
     # 索引更新
     if name or display_name:
-        async with SystemSession() as session:
-            await session.execute(
-                update(EntityIndex)
-                .where(
-                    EntityIndex.ontology_id == ontology_id,
-                    EntityIndex.entity_type == "DP",
-                    EntityIndex.name == prop_id,
+        try:
+            async with SystemSession() as session:
+                await session.execute(
+                    update(EntityIndex)
+                    .where(
+                        EntityIndex.ontology_id == ontology_id,
+                        EntityIndex.entity_type == "DP",
+                        EntityIndex.name == prop_id,
+                    )
+                    .values(name=name or prop_id, display_name=display_name)
                 )
-                .values(name=name or prop_id, display_name=display_name)
-            )
-            await session.commit()
+                await session.commit()
+        except Exception as e:
+            logger.error(f"update entity index failed: {e}")
 
     try:
         jena = get_jena_client(dataset)
@@ -701,8 +722,8 @@ async def update_data_property(
         for p in props:
             if p.id == prop_id:
                 return p
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"list dataprop after update failed: {e}")
     return None
 
 
@@ -810,36 +831,58 @@ async def update_object_property(
         return None
 
     prop_uri = f"{base_iri}{prop_id}"
-    domain_local_name = domain_ids[0] if domain_ids else None
-    range_local_name = range_ids[0] if range_ids else None
+    
+    # 先获取现有属性值，用于补齐未提供的字段
+    jena = get_jena_client(dataset)
+    try:
+        existing_props = jena.list_object_properties(base_iri)
+        existing = next((p for p in existing_props if p.id == prop_id), None)
+    except Exception as e:
+        logger.error(f"get existing objprop failed: {e}")
+        existing = None
+    
+    # 使用新值或保留现有值
+    domain_local_name = (domain_ids[0] if domain_ids else None) or (existing.domain_ids[0] if existing and existing.domain_ids else None)
+    range_local_name = (range_ids[0] if range_ids else None) or (existing.range_ids[0] if existing and existing.range_ids else None)
+    final_display_name = display_name or (existing.display_name if existing else None) or prop_id
+    final_characteristics = characteristics or (existing.characteristics if existing else [])
+    final_inverse_of_id = inverse_of_id or (existing.inverse_of_id if existing else None)
+
+    # 必须有 domain 和 range 才能创建属性
+    if not domain_local_name or not range_local_name:
+        logger.error(f"update objprop failed: missing domain or range")
+        return existing
 
     try:
-        jena = get_jena_client(dataset)
         jena.delete_object_property(prop_uri, tbox_graph=tbox_graph_uri)
         jena.create_object_property(
             base_iri,
             prop_id,  # prop_local_name
             domain_local_name,
             range_local_name,
-            display_name=display_name,
-            characteristics=characteristics,
-            inverse_of_local_name=inverse_of_id,
+            display_name=final_display_name,
+            characteristics=final_characteristics,
+            inverse_of_local_name=final_inverse_of_id,
         )
     except Exception as e:
         logger.error(f"update objprop failed: {e}")
+        return None
 
     if name or display_name:
-        async with SystemSession() as session:
-            await session.execute(
-                update(EntityIndex)
-                .where(
-                    EntityIndex.ontology_id == ontology_id,
-                    EntityIndex.entity_type == "OP",
-                    EntityIndex.name == prop_id,
+        try:
+            async with SystemSession() as session:
+                await session.execute(
+                    update(EntityIndex)
+                    .where(
+                        EntityIndex.ontology_id == ontology_id,
+                        EntityIndex.entity_type == "OP",
+                        EntityIndex.name == prop_id,
+                    )
+                    .values(name=name or prop_id, display_name=display_name)
                 )
-                .values(name=name or prop_id, display_name=display_name)
-            )
-            await session.commit()
+                await session.commit()
+        except Exception as e:
+            logger.error(f"update entity index failed: {e}")
 
     try:
         jena = get_jena_client(dataset)
@@ -847,8 +890,8 @@ async def update_object_property(
         for p in props:
             if p.id == prop_id:
                 return p
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"list objprop after update failed: {e}")
     return None
 
 

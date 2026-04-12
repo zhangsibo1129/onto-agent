@@ -16,6 +16,7 @@ interface IndividualCardProps {
   onClick?: (individual: Individual) => void;
   onEdit?: (individual: Individual) => void;
   onDelete?: (id: string) => void;
+  onNavigateToIndividual?: (individualId: string) => void;
 }
 
 export function IndividualCard({
@@ -25,6 +26,7 @@ export function IndividualCard({
   onClick,
   onEdit,
   onDelete,
+  onNavigateToIndividual,
 }: IndividualCardProps) {
   // 获取属性显示名称
   const getPropName = (propId: string) => {
@@ -106,7 +108,7 @@ export function IndividualCard({
                     className="assertion-target"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // 可以实现跳转逻辑
+                      onNavigateToIndividual?.(assertion.targetIndividualId);
                     }}
                   >
                     👤 {assertion.targetIndividualId}

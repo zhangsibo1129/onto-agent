@@ -5,7 +5,6 @@ import { Modal, Button } from "@/components/ui"
 import "./Ontologies.css"
 
 const colorMap: Record<number, { bg: string; color: string }> = {
-  0: { bg: "rgba(59, 130, 246, 0.1)", color: "var(--brand-primary)" },
   1: { bg: "rgba(59, 130, 246, 0.1)", color: "var(--brand-primary)" },
   2: { bg: "rgba(139, 92, 246, 0.1)", color: "var(--brand-secondary)" },
   3: { bg: "rgba(6, 182, 212, 0.1)", color: "var(--brand-accent)" },
@@ -30,6 +29,11 @@ const statusBadgeClass: Record<string, string> = {
 const statusText: Record<string, string> = {
   published: "已发布",
   draft: "草稿",
+}
+
+const statusFilterMap: Record<string, string> = {
+  "已发布": "published",
+  "草稿": "draft",
 }
 
 export default function Ontologies() {
@@ -60,7 +64,7 @@ export default function Ontologies() {
     const matchesSearch = o.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus =
       statusFilter === "全部状态" ||
-      statusText[o.status] === statusFilter
+      o.status === statusFilterMap[statusFilter]
     return matchesSearch && matchesStatus
   })
 

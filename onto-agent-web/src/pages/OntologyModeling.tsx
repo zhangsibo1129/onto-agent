@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { OntologyGraph, IndividualCard } from "@/components/ontology"
-import type { OntologyGraphData, ObjectProperty as GraphObjectProperty } from "@/components/ontology"
+import type { OntologyGraphData } from "@/components/ontology"
 import {
   ontologyApi,
   type Ontology,
@@ -9,8 +9,13 @@ import {
   type DataProperty,
   type ObjectProperty,
   type Individual,
+  type DataType,
 } from "@/services/ontologyApi"
 import "./OntologyModeling.css"
+
+// 合并两种 ObjectProperty 类型
+type ObjectPropertyWithAnyChar = ObjectProperty & { characteristics: string[] }
+type EditingEntity = OntologyClass | DataProperty | ObjectPropertyWithAnyChar | Individual
 
 // ============================================================
 // Types
@@ -47,14 +52,73 @@ export default function OntologyModeling() {
   const [objectProperties, setObjectProperties] = useState<ObjectProperty[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
-  const [selectedRelation, setSelectedRelation] = useState<GraphObjectProperty | null>(null)
+  const [selectedRelation, setSelectedRelation] = useState<ObjectPropertyWithAnyChar | null>(null)
   const [showAddModal, setShowAddModal] = useState<"class" | "dataProperty" | "objectProperty" | null>(null)
   const [showEditModal, setShowEditModal] = useState<"class" | "dataProperty" | "objectProperty" | "individual" | null>(null)
-  const [editingEntity, setEditingEntity] = useState<OntologyClass | DataProperty | ObjectProperty | Individual | null>(null)
+  const [editingEntity, setEditingEntity] = useState<EditingEntity | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ type: string; id: string; name: string } | null>(null)
   const [individuals, setIndividuals] = useState<Individual[]>([])
   const [individualsLoading, setIndividualsLoading] = useState(false)
   const [individualSearch, setIndividualSearch] = useState("")
+  const [graphSearch, setGraphSearch] = useState("")
+
+  // 添加表单状态
+  const [addClassForm, setAddClassForm] = useState({ name: "", displayName: "", superClass: "", description: "" })
+  const [addDataPropForm, setAddDataPropForm] = useState({ name: "", displayName: "", domainId: "", rangeType: "string" })
+  const [addObjPropForm, setAddObjPropForm] = useState({ name: "", displayName: "", sourceId: "", targetId: "" })
+  
+  // 编辑表单状态
+  const [editClassForm, setEditClassForm] = useState({ displayName: "", superClass: "", description: "" })
+  const [editDataPropForm, setEditDataPropForm] = useState({ displayName: "", domainId: "", rangeType: "string" })
+  const [editObjPropForm, setEditObjPropForm] = useState({ displayName: "", sourceId: "", targetId: "" })
+  const [editIndForm, setEditIndForm] = useState({ displayName: "" })
+  
+  // 同步编辑数据到表单
+  useEffect(() => {
+    if (editingEntity) {
+      if (showEditModal === "class") {
+        const cls = editingEntity as OntologyClass
+        setEditClassForm({
+          displayName: cls.displayName || "",
+          superClass: cls.superClasses?.[0] || "",
+          description: cls.description || ""
+        })
+      } else if (showEditModal === "dataProperty") {
+        const prop = editingEntity as DataProperty
+        setEditDataPropForm({
+          displayName: prop.displayName || "",
+          domainId: prop.domainIds?.[0] || "",
+          rangeType: prop.rangeType || "string"
+        })
+      } else if (showEditModal === "objectProperty") {
+        const prop = editingEntity as ObjectProperty
+        setEditObjPropForm({
+          displayName: prop.displayName || "",
+          sourceId: prop.domainIds?.[0] || "",
+          targetId: prop.rangeIds?.[0] || ""
+        })
+      } else if (showEditModal === "individual") {
+        const ind = editingEntity as Individual
+        setEditIndForm({ displayName: ind.displayName || "" })
+      }
+    }
+  }, [editingEntity, showEditModal])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(individualSearch)
+    }, 300)
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [individualSearch])
 
   useEffect(() => {
     if (!id) return
@@ -71,7 +135,7 @@ export default function OntologyModeling() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // 加载该类的实例
+  // 加载该类的实例（防抖）
   useEffect(() => {
     if (!id || !selectedClassId) {
       setIndividuals([])
@@ -79,11 +143,11 @@ export default function OntologyModeling() {
     }
     setIndividualsLoading(true)
     ontologyApi
-      .getIndividuals(id, { classId: selectedClassId, search: individualSearch || undefined })
+      .getIndividuals(id, { classId: selectedClassId, search: debouncedSearch || undefined })
       .then(setIndividuals)
       .catch(console.error)
       .finally(() => setIndividualsLoading(false))
-  }, [id, selectedClassId, individualSearch])
+  }, [id, selectedClassId, debouncedSearch])
 
   const handleClassSelect = useCallback((classId: string | null) => {
     setSelectedClassId(classId)
@@ -157,7 +221,7 @@ export default function OntologyModeling() {
   )
 
   const handleUpdateDataProperty = useCallback(
-    async (propId: string, updates: { displayName?: string; domainIds?: string[]; rangeType?: string }) => {
+    async (propId: string, updates: { displayName?: string; domainIds?: string[]; rangeType?: DataType }) => {
       if (!id) return
       const updated = await ontologyApi.updateDataProperty(id, propId, updates)
       setDataProperties((prev) => prev.map((p) => (p.id === propId ? updated : p)))
@@ -326,7 +390,13 @@ export default function OntologyModeling() {
               <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" fill="none" />
               <line x1="12" y1="12" x2="16" y2="16" stroke="currentColor" strokeWidth="1.5" />
             </svg>
-            <input type="text" placeholder="搜索..." className="search-input" />
+            <input 
+              type="text" 
+              placeholder="搜索类/属性..." 
+              className="search-input"
+              value={graphSearch}
+              onChange={(e) => setGraphSearch(e.target.value)}
+            />
           </div>
         </div>
 
@@ -357,13 +427,13 @@ export default function OntologyModeling() {
               </button>
             </div>
             <div className="btn-group-secondary">
-              <button className="btn-toolbar">
+              <button className="btn-toolbar" onClick={() => alert("导入功能开发中")}>
                 <svg viewBox="0 0 16 16" width="14" height="14">
                   <path d="M2 4h5l1 2h6v8H2V4z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
                 </svg>
                 导入
               </button>
-              <button className="btn-toolbar">
+              <button className="btn-toolbar" onClick={() => alert("导出功能开发中")}>
                 <svg viewBox="0 0 16 16" width="14" height="14">
                   <path d="M2 10V12h12v-2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M8 2v8M5 5l3-3 3 3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -371,7 +441,7 @@ export default function OntologyModeling() {
                 导出
               </button>
             </div>
-            <button className="btn-toolbar btn-toolbar-primary">
+            <button className="btn-toolbar btn-toolbar-primary" onClick={() => alert("保存功能开发中")}>
               <svg viewBox="0 0 16 16" width="14" height="14">
                 <path d="M2 10V12h12v-2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M4 10V6h4l2 2v2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -716,6 +786,9 @@ export default function OntologyModeling() {
                             setShowEditModal("individual")
                           }}
                           onDelete={(id) => setShowDeleteConfirm({ type: "individual", id, name: individuals.find(i => i.id === id)?.displayName || id })}
+                          onNavigateToIndividual={(targetId) => {
+                            alert(`跳转到实例: ${targetId} (功能开发中)`)
+                          }}
                         />
                       ))
                     ) : (
@@ -750,15 +823,31 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">英文名称 *</label>
-                    <input type="text" className="form-input" placeholder="Product" id="className" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Product" 
+                      value={addClassForm.name}
+                      onChange={(e) => setAddClassForm({ ...addClassForm, name: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" placeholder="产品" id="classDisplayName" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="产品" 
+                      value={addClassForm.displayName}
+                      onChange={(e) => setAddClassForm({ ...addClassForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">父类</label>
-                    <select className="form-select" id="classSuperClass">
+                    <select 
+                      className="form-select"
+                      value={addClassForm.superClass}
+                      onChange={(e) => setAddClassForm({ ...addClassForm, superClass: e.target.value })}
+                    >
                       <option value="">无（顶层类）</option>
                       {classes.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -769,7 +858,13 @@ export default function OntologyModeling() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">描述</label>
-                    <input type="text" className="form-input" placeholder="商品或服务实体" id="classDescription" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="商品或服务实体" 
+                      value={addClassForm.description}
+                      onChange={(e) => setAddClassForm({ ...addClassForm, description: e.target.value })}
+                    />
                   </div>
                 </>
               )}
@@ -778,15 +873,31 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">英文名称 *</label>
-                    <input type="text" className="form-input" placeholder="hasName" id="propName" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="hasName" 
+                      value={addDataPropForm.name}
+                      onChange={(e) => setAddDataPropForm({ ...addDataPropForm, name: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" placeholder="名称" id="propDisplayName" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="名称" 
+                      value={addDataPropForm.displayName}
+                      onChange={(e) => setAddDataPropForm({ ...addDataPropForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">所属类 *</label>
-                    <select className="form-select" id="propDomain">
+                    <select 
+                      className="form-select"
+                      value={addDataPropForm.domainId}
+                      onChange={(e) => setAddDataPropForm({ ...addDataPropForm, domainId: e.target.value })}
+                    >
                       {classes.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.displayName || c.name}
@@ -796,7 +907,11 @@ export default function OntologyModeling() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">数据类型</label>
-                    <select className="form-select" id="propRange">
+                    <select 
+                      className="form-select"
+                      value={addDataPropForm.rangeType}
+                      onChange={(e) => setAddDataPropForm({ ...addDataPropForm, rangeType: e.target.value })}
+                    >
                       {DATA_TYPES.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -811,16 +926,32 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">英文名称 *</label>
-                    <input type="text" className="form-input" placeholder="belongsTo" id="relName" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="belongsTo" 
+                      value={addObjPropForm.name}
+                      onChange={(e) => setAddObjPropForm({ ...addObjPropForm, name: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" placeholder="属于" id="relDisplayName" />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="属于" 
+                      value={addObjPropForm.displayName}
+                      onChange={(e) => setAddObjPropForm({ ...addObjPropForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-row">
                     <div className="form-group">
                       <label className="form-label">源类 *</label>
-                      <select className="form-select" id="relSource">
+                      <select 
+                        className="form-select"
+                        value={addObjPropForm.sourceId}
+                        onChange={(e) => setAddObjPropForm({ ...addObjPropForm, sourceId: e.target.value })}
+                      >
                         {classes.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.displayName || c.name}
@@ -830,7 +961,11 @@ export default function OntologyModeling() {
                     </div>
                     <div className="form-group">
                       <label className="form-label">目标类 *</label>
-                      <select className="form-select" id="relTarget">
+                      <select 
+                        className="form-select"
+                        value={addObjPropForm.targetId}
+                        onChange={(e) => setAddObjPropForm({ ...addObjPropForm, targetId: e.target.value })}
+                      >
                         {classes.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.displayName || c.name}
@@ -850,37 +985,29 @@ export default function OntologyModeling() {
                 className="btn btn-primary"
                 onClick={() => {
                   if (showAddModal === "class") {
-                    const nameInput = document.getElementById("className") as HTMLInputElement
-                    const displayInput = document.getElementById("classDisplayName") as HTMLInputElement
-                    const superClassSelect = document.getElementById("classSuperClass") as HTMLSelectElement
-                    if (nameInput.value) {
-                      handleCreateClass(nameInput.value, displayInput.value || nameInput.value, superClassSelect.value)
+                    if (addClassForm.name) {
+                      handleCreateClass(addClassForm.name, addClassForm.displayName || addClassForm.name, addClassForm.superClass || undefined)
+                      setAddClassForm({ name: "", displayName: "", superClass: "", description: "" })
                     }
                   } else if (showAddModal === "dataProperty") {
-                    const nameInput = document.getElementById("propName") as HTMLInputElement
-                    const displayInput = document.getElementById("propDisplayName") as HTMLInputElement
-                    const domainSelect = document.getElementById("propDomain") as HTMLSelectElement
-                    const rangeSelect = document.getElementById("propRange") as HTMLSelectElement
-                    if (nameInput.value) {
+                    if (addDataPropForm.name && addDataPropForm.domainId) {
                       handleCreateDataProperty(
-                        nameInput.value,
-                        displayInput.value || nameInput.value,
-                        domainSelect.value,
-                        rangeSelect.value
+                        addDataPropForm.name,
+                        addDataPropForm.displayName || addDataPropForm.name,
+                        addDataPropForm.domainId,
+                        addDataPropForm.rangeType
                       )
+                      setAddDataPropForm({ name: "", displayName: "", domainId: "", rangeType: "string" })
                     }
                   } else if (showAddModal === "objectProperty") {
-                    const nameInput = document.getElementById("relName") as HTMLInputElement
-                    const displayInput = document.getElementById("relDisplayName") as HTMLInputElement
-                    const sourceSelect = document.getElementById("relSource") as HTMLSelectElement
-                    const targetSelect = document.getElementById("relTarget") as HTMLSelectElement
-                    if (nameInput.value) {
+                    if (addObjPropForm.name && addObjPropForm.sourceId && addObjPropForm.targetId) {
                       handleCreateObjectProperty(
-                        nameInput.value,
-                        displayInput.value || nameInput.value,
-                        sourceSelect.value,
-                        targetSelect.value
+                        addObjPropForm.name,
+                        addObjPropForm.displayName || addObjPropForm.name,
+                        addObjPropForm.sourceId,
+                        addObjPropForm.targetId
                       )
+                      setAddObjPropForm({ name: "", displayName: "", sourceId: "", targetId: "" })
                     }
                   }
                 }}
@@ -912,11 +1039,20 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" id="editClassDisplayName" defaultValue={(editingEntity as OntologyClass).displayName || ""} />
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      value={editClassForm.displayName}
+                      onChange={(e) => setEditClassForm({ ...editClassForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">父类</label>
-                    <select className="form-select" id="editClassSuperClass" defaultValue={(editingEntity as OntologyClass).superClasses?.[0] || ""}>
+                    <select 
+                      className="form-select"
+                      value={editClassForm.superClass}
+                      onChange={(e) => setEditClassForm({ ...editClassForm, superClass: e.target.value })}
+                    >
                       <option value="">无（顶层类）</option>
                       {classes.filter((c) => c.id !== (editingEntity as OntologyClass).id).map((c) => (
                         <option key={c.id} value={c.id}>
@@ -927,7 +1063,12 @@ export default function OntologyModeling() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">描述</label>
-                    <input type="text" className="form-input" id="editClassDescription" defaultValue={(editingEntity as OntologyClass).description || ""} />
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      value={editClassForm.description}
+                      onChange={(e) => setEditClassForm({ ...editClassForm, description: e.target.value })}
+                    />
                   </div>
                 </>
               )}
@@ -936,11 +1077,20 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" id="editPropDisplayName" defaultValue={(editingEntity as DataProperty).displayName || ""} />
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      value={editDataPropForm.displayName}
+                      onChange={(e) => setEditDataPropForm({ ...editDataPropForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">所属类</label>
-                    <select className="form-select" id="editPropDomain" defaultValue={(editingEntity as DataProperty).domainIds?.[0] || ""}>
+                    <select 
+                      className="form-select"
+                      value={editDataPropForm.domainId}
+                      onChange={(e) => setEditDataPropForm({ ...editDataPropForm, domainId: e.target.value })}
+                    >
                       {classes.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.displayName || c.name}
@@ -950,7 +1100,11 @@ export default function OntologyModeling() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">数据类型</label>
-                    <select className="form-select" id="editPropRange" defaultValue={(editingEntity as DataProperty).rangeType || "string"}>
+                    <select 
+                      className="form-select"
+                      value={editDataPropForm.rangeType}
+                      onChange={(e) => setEditDataPropForm({ ...editDataPropForm, rangeType: e.target.value })}
+                    >
                       {DATA_TYPES.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -965,12 +1119,21 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" id="editRelDisplayName" defaultValue={(editingEntity as ObjectProperty).displayName || ""} />
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      value={editObjPropForm.displayName}
+                      onChange={(e) => setEditObjPropForm({ ...editObjPropForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-row">
                     <div className="form-group">
                       <label className="form-label">源类</label>
-                      <select className="form-select" id="editRelSource" defaultValue={(editingEntity as ObjectProperty).domainIds?.[0] || ""}>
+                      <select 
+                        className="form-select"
+                        value={editObjPropForm.sourceId}
+                        onChange={(e) => setEditObjPropForm({ ...editObjPropForm, sourceId: e.target.value })}
+                      >
                         {classes.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.displayName || c.name}
@@ -980,7 +1143,11 @@ export default function OntologyModeling() {
                     </div>
                     <div className="form-group">
                       <label className="form-label">目标类</label>
-                      <select className="form-select" id="editRelTarget" defaultValue={(editingEntity as ObjectProperty).rangeIds?.[0] || ""}>
+                      <select 
+                        className="form-select"
+                        value={editObjPropForm.targetId}
+                        onChange={(e) => setEditObjPropForm({ ...editObjPropForm, targetId: e.target.value })}
+                      >
                         {classes.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.displayName || c.name}
@@ -996,7 +1163,12 @@ export default function OntologyModeling() {
                 <>
                   <div className="form-group">
                     <label className="form-label">显示名称</label>
-                    <input type="text" className="form-input" id="editIndDisplayName" defaultValue={(editingEntity as Individual).displayName || ""} />
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      value={editIndForm.displayName}
+                      onChange={(e) => setEditIndForm({ ...editIndForm, displayName: e.target.value })}
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label">说明</label>
@@ -1013,36 +1185,26 @@ export default function OntologyModeling() {
                 className="btn btn-primary"
                 onClick={() => {
                   if (showEditModal === "class") {
-                    const displayInput = document.getElementById("editClassDisplayName") as HTMLInputElement
-                    const superSelect = document.getElementById("editClassSuperClass") as HTMLSelectElement
-                    const descInput = document.getElementById("editClassDescription") as HTMLInputElement
                     handleUpdateClass((editingEntity as OntologyClass).id, {
-                      displayName: displayInput.value || undefined,
-                      description: descInput.value || undefined,
-                      superClasses: superSelect.value ? [superSelect.value] : undefined,
+                      displayName: editClassForm.displayName || undefined,
+                      description: editClassForm.description || undefined,
+                      superClasses: editClassForm.superClass ? [editClassForm.superClass] : [],
                     })
                   } else if (showEditModal === "dataProperty") {
-                    const displayInput = document.getElementById("editPropDisplayName") as HTMLInputElement
-                    const domainSelect = document.getElementById("editPropDomain") as HTMLSelectElement
-                    const rangeSelect = document.getElementById("editPropRange") as HTMLSelectElement
                     handleUpdateDataProperty((editingEntity as DataProperty).id, {
-                      displayName: displayInput.value || undefined,
-                      domainIds: domainSelect.value ? [domainSelect.value] : undefined,
-                      rangeType: rangeSelect.value as DataProperty["rangeType"],
+                      displayName: editDataPropForm.displayName || undefined,
+                      domainIds: editDataPropForm.domainId ? [editDataPropForm.domainId] : [],
+                      rangeType: editDataPropForm.rangeType as DataType,
                     })
                   } else if (showEditModal === "objectProperty") {
-                    const displayInput = document.getElementById("editRelDisplayName") as HTMLInputElement
-                    const sourceSelect = document.getElementById("editRelSource") as HTMLSelectElement
-                    const targetSelect = document.getElementById("editRelTarget") as HTMLSelectElement
                     handleUpdateObjectProperty((editingEntity as ObjectProperty).id, {
-                      displayName: displayInput.value || undefined,
-                      domainIds: sourceSelect.value ? [sourceSelect.value] : undefined,
-                      rangeIds: targetSelect.value ? [targetSelect.value] : undefined,
+                      displayName: editObjPropForm.displayName || undefined,
+                      domainIds: editObjPropForm.sourceId ? [editObjPropForm.sourceId] : [],
+                      rangeIds: editObjPropForm.targetId ? [editObjPropForm.targetId] : [],
                     })
                   } else if (showEditModal === "individual") {
-                    const displayInput = document.getElementById("editIndDisplayName") as HTMLInputElement
                     handleUpdateIndividual((editingEntity as Individual).id, {
-                      displayName: displayInput.value || undefined,
+                      displayName: editIndForm.displayName || undefined,
                     })
                   }
                 }}

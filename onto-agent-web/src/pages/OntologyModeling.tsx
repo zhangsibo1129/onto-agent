@@ -312,7 +312,37 @@ export default function OntologyModeling() {
     )
   }
 
-  const relations: OntologyRelation[] = objectProperties.flatMap((op) =>
+  const getPropertyById = (propId: string) =>
+    [...filteredDataProperties, ...filteredObjectProperties].find((p) => p.id === propId)
+
+  const getClassById = (classId: string) => filteredClasses.find((c) => c.id === classId)
+
+  const filteredClasses = graphSearch
+    ? classes.filter(c => 
+        c.name.toLowerCase().includes(graphSearch.toLowerCase()) ||
+        c.displayName?.toLowerCase().includes(graphSearch.toLowerCase())
+      )
+    : classes
+
+  const filteredDataProperties = graphSearch
+    ? dataProperties.filter(p =>
+        p.name.toLowerCase().includes(graphSearch.toLowerCase()) ||
+        p.displayName?.toLowerCase().includes(graphSearch.toLowerCase())
+      )
+    : dataProperties
+
+  const filteredObjectProperties = graphSearch
+    ? objectProperties.filter(p =>
+        p.name.toLowerCase().includes(graphSearch.toLowerCase()) ||
+        p.displayName?.toLowerCase().includes(graphSearch.toLowerCase())
+      )
+    : objectProperties
+
+  const selectedClass = classes.find((c) => c.id === selectedClassId)
+  const selectedClassDataProperties = filteredDataProperties.filter((p) =>
+    p.domainIds?.includes(selectedClassId || "") || false
+  )
+  const relations: OntologyRelation[] = filteredObjectProperties.flatMap((op) =>
     (op.domainIds || []).flatMap((domainId) =>
       (op.rangeIds || []).map((rangeId) => ({
         id: `${op.id}-${domainId}-${rangeId}`,
@@ -322,23 +352,13 @@ export default function OntologyModeling() {
       }))
     )
   )
-
-  const getPropertyById = (propId: string) =>
-    [...dataProperties, ...objectProperties].find((p) => p.id === propId)
-
-  const getClassById = (classId: string) => classes.find((c) => c.id === classId)
-
-  const selectedClass = classes.find((c) => c.id === selectedClassId)
-  const selectedClassDataProperties = dataProperties.filter((p) =>
-    p.domainIds?.includes(selectedClassId || "") || false
-  )
   const incomingRelations = relations.filter((r) => r.targetId === selectedClassId)
   const outgoingRelations = relations.filter((r) => r.sourceId === selectedClassId)
 
   const graphData: OntologyGraphData = {
-    classes,
-    dataProperties,
-    objectProperties,
+    classes: filteredClasses,
+    dataProperties: filteredDataProperties,
+    objectProperties: filteredObjectProperties,
   }
 
   const DATA_TYPES = [

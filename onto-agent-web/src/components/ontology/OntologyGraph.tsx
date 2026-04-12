@@ -664,6 +664,7 @@ interface OntologyGraphProps {
 
 export default function OntologyGraph({
   data,
+  selectedClassId,
   onClassSelect,
   onLinkClick,
   width = 800,
@@ -676,9 +677,13 @@ export default function OntologyGraph({
   const [zoomLevel, setZoomLevel] = useState(1)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [hoveredLinkId, setHoveredLinkId] = useState<string | null>(null)
-  const selectedIdRef = useRef<string | null>(null)
+  const selectedIdRef = useRef<string | null>(selectedClassId || null)
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef(false)
+
+  useEffect(() => {
+    selectedIdRef.current = selectedClassId || null
+  }, [selectedClassId])
 
   useEffect(() => {
     if (graphRef.current) {
@@ -776,8 +781,9 @@ export default function OntologyGraph({
     (node: NodeObject) => {
       if (dragStartPosRef.current) return
       const id = (node as GraphNode).id
-      selectedIdRef.current = selectedIdRef.current === id ? null : id
-      onClassSelect?.(id)
+      const newId = selectedIdRef.current === id ? null : id
+      selectedIdRef.current = newId
+      onClassSelect?.(newId)
     },
     [onClassSelect]
   )
